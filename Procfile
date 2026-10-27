@@ -1,0 +1,1 @@
+worker: python EthioExam_Questions_bot.py
