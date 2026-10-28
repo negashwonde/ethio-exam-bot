@@ -80,7 +80,7 @@ async def cmd_start(message: types.Message):
   )
 
 
-# ፈተና መጀመሪያ
+# ፈተና መጀመሪያ (እዚህ ጋር '2018 ጥር' ተደርጎ ተስተካክሏል)
 @dp.callback_query(F.data == "exam_2018")
 async def start_2018_exam(callback: types.CallbackQuery):
   await callback.answer()
@@ -89,7 +89,7 @@ async def start_2018_exam(callback: types.CallbackQuery):
   cursor = conn.cursor()
   cursor.execute(
       "SELECT id, question_text, option_a, option_b, option_c, option_d FROM"
-      " questions WHERE exam_year = '2018' LIMIT 1"
+      " questions WHERE exam_year = '2018 ጥር' LIMIT 1"
   )
   q = cursor.fetchone()
   conn.close()
@@ -172,7 +172,7 @@ async def check_answer(callback: types.CallbackQuery):
     )
 
 
-# ቀጣይ ጥያቄ
+# ቀጣይ ጥያቄ (እዚህም '2018 ጥር' ተደርጎ ተስተካክሏል)
 @dp.callback_query(F.data.startswith("next_"))
 async def next_question(callback: types.CallbackQuery):
   await callback.answer()
@@ -183,7 +183,8 @@ async def next_question(callback: types.CallbackQuery):
   cursor = conn.cursor()
   cursor.execute(
       "SELECT id, question_text, option_a, option_b, option_c, option_d FROM"
-      " questions WHERE id > ? AND exam_year = '2018' ORDER BY id ASC LIMIT 1",
+      " questions WHERE id > ? AND exam_year = '2018 ጥር' ORDER BY id ASC LIMIT"
+      " 1",
       (current_id,),
   )
   q = cursor.fetchone()
