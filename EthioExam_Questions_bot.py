@@ -25,7 +25,7 @@ def run_flask():
 
 
 # 2. የቴሌግራም ቦት ማዋቀር
-TOKEN = "8989053444:AAGi6glRFJ4Besq0yvTEJGm2YakJgYnjKdw1"
+TOKEN = "8989053444:AAGi6glRFJ4Besq0yvTEJGm2YakJgYnjKdw"
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
