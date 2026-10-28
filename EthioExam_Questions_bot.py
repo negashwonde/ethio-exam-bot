@@ -263,7 +263,90 @@ async def admin_reject(callback: types.CallbackQuery):
         print(f"Error sending message to user: {e}")
 
 
-# 6. Random Quiz (10 ጥያቄዎች በዘፈቀደ)
+# 6. መልስ ማረጋገጫ እና Next ቁልፍ ማሳያ
+@dp.callback_query(F.data.startswith("ans_"))
+async def check_answer(callback: types.CallbackQuery):
+    await callback.answer()
+    user_id = callback.from_user.id
+
+    parts = callback.data.split("_")
+    q_id = parts[1]
+    chosen_opt = parts[2]
+
+    # የተጠቃሚውን ነጻ ጥያቄ ብዛት በአንድ መጨመር
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT free_questions_used, payment_status FROM users WHERE user_id = ?", (user_id,))
+    res_user = cursor.fetchone()
+
+    if res_user:
+        free_used, pay_status = res_user
+        if pay_status != 'paid':
+            cursor.execute("UPDATE users SET free_questions_used = free_questions_used + 1 WHERE user_id = ?",
+                           (user_id,))
+            conn.commit()
+
+    # ትክክለኛውን መልስ ከዳታቤዝ ማምጣት
+    cursor.execute("SELECT correct_answer, explanation FROM questions WHERE id = ?", (q_id,))
+    res = cursor.fetchone()
+    conn.close()
+
+    if res:
+        correct, explanation = res
+
+        if chosen_opt == correct:
+            result_text = "✅ **ትክክል ነው! (Correct)**"
+        else:
+            result_text = f"❌ **ስህተት ነው። ትክክለኛው መልስ: {correct}**"
+
+        builder = InlineKeyboardBuilder()
+        builder.row(types.InlineKeyboardButton(text="➡️ Next Question (ቀጣይ)", callback_data=f"next_{q_id}"))
+
+        feedback = f"{result_text}\n\n💡 **ማብራሪያ (Explanation):**\n{explanation}"
+        await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+# 7. ቀጣይ ጥያቄ (Next Question ሎጂክ)
+@dp.callback_query(F.data.startswith("next_"))
+async def next_question(callback: types.CallbackQuery):
+    await callback.answer()
+
+    current_id = int(callback.data.split("_")[1])
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE id > ? AND exam_year = '2018 ጥር' ORDER BY id ASC LIMIT 1",
+        (current_id,),
+    )
+    q = cursor.fetchone()
+    conn.close()
+
+    if q:
+        q_id, q_text, opt_a, opt_b, opt_c, opt_d = q
+
+        builder = InlineKeyboardBuilder()
+        builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}", callback_data=f"ans_{q_id}_A"))
+        builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}", callback_data=f"ans_{q_id}_B"))
+        builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}", callback_data=f"ans_{q_id}_C"))
+        builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}", callback_data=f"ans_{q_id}_D"))
+
+        await callback.message.answer(
+            f"📝 **2018 Exit Exam - Next Question:**\n\n{q_text}",
+            reply_markup=builder.as_markup(),
+            parse_mode="Markdown",
+        )
+    else:
+        builder = InlineKeyboardBuilder()
+        builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+        await callback.message.answer(
+            "🎉 **እንኳን ደስ አለዎት!** የ 2018 ጥያቄዎችን በሙሉ አጠናቀዋል።",
+            reply_markup=builder.as_markup(),
+            parse_mode="Markdown"
+        )
+
+
+# 8. Random Quiz (10 ጥያቄዎች በዘፈቀደ)
 @dp.callback_query(F.data == "random_quiz")
 async def random_quiz_handler(callback: types.CallbackQuery):
     await callback.answer()
@@ -271,27 +354,25 @@ async def random_quiz_handler(callback: types.CallbackQuery):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions ORDER BY RANDOM() LIMIT 10")
-    questions = cursor.fetchall()
+        "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions ORDER BY RANDOM() LIMIT 1")
+    q = cursor.fetchone()
     conn.close()
 
-    if questions:
-        await callback.message.answer("🎲 **የ 10 ጥያቄዎች Random Quiz ተጀምሯል!**")
-        for idx, q in enumerate(questions, 1):
-            q_id, q_text, opt_a, opt_b, opt_c, opt_d = q
-            builder = InlineKeyboardBuilder()
-            builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}", callback_data=f"ans_{q_id}_A"))
-            builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}", callback_data=f"ans_{q_id}_B"))
-            builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}", callback_data=f"ans_{q_id}_C"))
-            builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}", callback_data=f"ans_{q_id}_D"))
+    if q:
+        q_id, q_text, opt_a, opt_b, opt_c, opt_d = q
+        builder = InlineKeyboardBuilder()
+        builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}", callback_data=f"ans_{q_id}_A"))
+        builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}", callback_data=f"ans_{q_id}_B"))
+        builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}", callback_data=f"ans_{q_id}_C"))
+        builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}", callback_data=f"ans_{q_id}_D"))
 
-            await callback.message.answer(f"❓ **Quiz Question {idx}:**\n\n{q_text}", reply_markup=builder.as_markup(),
-                                          parse_mode="Markdown")
+        await callback.message.answer(f"🎲 **Random Quiz Question:**\n\n{q_text}", reply_markup=builder.as_markup(),
+                                      parse_mode="Markdown")
     else:
         await callback.message.answer("⚠️ በዳታቤዙ ውስጥ ጥያቄዎች አልተገኙም!")
 
 
-# 7. Tutorial Package (ለኮምፒውተር ሳይንስ 15ቱ ኮርሶች)
+# 9. Tutorial Package (ለኮምፒውተር ሳይንስ 15ቱ ኮርሶች)
 @dp.callback_query(F.data == "tutorial_package")
 async def tutorial_package_handler(callback: types.CallbackQuery):
     await callback.answer()
@@ -322,7 +403,7 @@ async def tutorial_package_handler(callback: types.CallbackQuery):
     await callback.message.answer(courses_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 8. Help ሜኑ
+# 10. Help ሜኑ
 @dp.callback_query(F.data == "help_menu")
 async def help_handler(callback: types.CallbackQuery):
     await callback.answer()
@@ -364,46 +445,6 @@ async def bookmarks_handler(callback: types.CallbackQuery):
 async def back_to_menu(callback: types.CallbackQuery):
     await callback.message.delete()
     await cmd_start(callback.message)
-
-
-# መልስ ማረጋገጫ እና የነጻ ገደብ (Free Limit) መቆጣጠሪያ
-@dp.callback_query(F.data.startswith("ans_"))
-async def check_answer(callback: types.CallbackQuery):
-    await callback.answer()
-    user_id = callback.from_user.id
-
-    parts = callback.data.split("_")
-    q_id = parts[1]
-    chosen_opt = parts[2]
-
-    # የተጠቃሚውን ነጻ ጥያቄ ብዛት በአንድ መጨመር
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT free_questions_used, payment_status FROM users WHERE user_id = ?", (user_id,))
-    res_user = cursor.fetchone()
-
-    if res_user:
-        free_used, pay_status = res_user
-        if pay_status != 'paid':
-            cursor.execute("UPDATE users SET free_questions_used = free_questions_used + 1 WHERE user_id = ?",
-                           (user_id,))
-            conn.commit()
-
-    # ትክክለኛውን መልስ ከዳታቤዝ ማምጣት
-    cursor.execute("SELECT correct_answer, explanation FROM questions WHERE id = ?", (q_id,))
-    res = cursor.fetchone()
-    conn.close()
-
-    if res:
-        correct, explanation = res
-
-        if chosen_opt == correct:
-            result_text = "✅ **ትክክል ነው! (Correct)**"
-        else:
-            result_text = f"❌ **ስህተት ነው። ትክክለኛው መልስ: {correct}**"
-
-        feedback = f"{result_text}\n\n💡 **ማብራሪያ (Explanation):**\n{explanation}"
-        await callback.message.answer(feedback, parse_mode="Markdown")
 
 
 async def main():
