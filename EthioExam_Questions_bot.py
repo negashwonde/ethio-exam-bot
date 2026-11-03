@@ -8,7 +8,7 @@ import os
 from flask import Flask
 from threading import Thread
 
-# 1. ዌብ ሰርቨር (Flask) ማዋቀር - Render የ ፖርት ጥያቄን እንዲቀበል
+# 1. ዌብ ሰርቨር (Flask) ማዋቀር - Render 24/7 እንዲሠራ
 app = Flask("")
 
 
@@ -54,12 +54,13 @@ def init_db():
         )
     """)
 
-    # የተጠቃሚዎችን የነጻ ጥያቄ ብዛት እና የክፍያ ሁኔታ (Status: 'free', 'pending', 'paid') መከታተያ
+    # የተጠቃሚዎችን የነጻ ጥያቄ ብዛት እና በዲፓርትመንት የተከፈለ የክፍያ ሁኔታ መከታተያ
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
             free_questions_used INTEGER DEFAULT 0,
-            payment_status TEXT DEFAULT 'free'
+            payment_status TEXT DEFAULT 'free',
+            paid_department TEXT DEFAULT ''
         )
     """)
 
@@ -76,7 +77,7 @@ async def cmd_start(message: types.Message):
     # ተጠቃሚው በዳታቤዝ ውስጥ መኖሩን ማረጋገጥ
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("INSERT OR IGNORE INTO users (user_id, free_questions_used, payment_status) VALUES (?, 0, 'free')",
+    cursor.execute("INSERT OR IGNORE INTO users (user_id, free_questions_used, payment_status, paid_department) VALUES (?, 0, 'free', '')",
                    (user_id,))
     conn.commit()
     conn.close()
@@ -91,7 +92,7 @@ async def cmd_start(message: types.Message):
         types.InlineKeyboardButton(text="🔖 Bookmarks", callback_data="my_bookmarks")
     )
     builder.row(
-        types.InlineKeyboardButton(text="🎓 Tutorial Package (Upgrade)", callback_data="tutorial_package")
+        types.InlineKeyboardButton(text="🎓 Tutorial Package (PPT/PDF)", callback_data="tutorial_package")
     )
     builder.row(
         types.InlineKeyboardButton(text="🎲 Random Quiz", callback_data="random_quiz"),
@@ -108,7 +109,7 @@ async def cmd_start(message: types.Message):
     await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 1. Computer Science አማራጭ ሲነካ (2018 ጥር ፈተና)
+# 1. Computer Science አማራጭ ሲነካ (በዲፓርትመንት የተከፈለ ፍተሻ)
 @dp.callback_query(F.data == "dept_cs")
 async def start_cs_exam(callback: types.CallbackQuery):
     await callback.answer()
@@ -116,16 +117,17 @@ async def start_cs_exam(callback: types.CallbackQuery):
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT free_questions_used, payment_status FROM users WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?", (user_id,))
     user_data = cursor.fetchone()
     conn.close()
 
     free_used = user_data[0] if user_data else 0
     pay_status = user_data[1] if user_data else 'free'
+    paid_dept = user_data[2] if user_data else ''
 
-    # ክፍያ ካልፈጸመ እና 3ቱ ነጻ ጥያቄዎች ካለቁ ክፍያ ይጠይቅ
-    if pay_status != 'paid' and free_used >= 3:
-        await send_payment_prompt(callback.message)
+    # ክፍያው ለዚህ ዲፓርትመንት (cs) ካልተፈጸመ እና 3ቱ ነጻ ጥያቄዎች ካለቁ ክፍያ ይጠይቅ
+    if (pay_status != 'paid' or paid_dept != 'cs') and free_used >= 3:
+        await send_payment_prompt(callback.message, "Computer Science (CS)")
         return
 
     # የመጀመሪያውን ጥያቄ ማምጣት
@@ -145,25 +147,26 @@ async def start_cs_exam(callback: types.CallbackQuery):
         builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}", callback_data=f"ans_{q_id}_C"))
         builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}", callback_data=f"ans_{q_id}_D"))
 
-        rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - free_used})" if pay_status != 'paid' else " (VIP የተከፈተ 🌟)"
+        rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - free_used})" if pay_status != 'paid' or paid_dept != 'cs' else " (VIP የተከፈተ 🌟)"
         await callback.message.answer(f"📝 **Computer Science Exit Exam - Q1{rem_text}:**\n\n{q_text}",
                                       reply_markup=builder.as_markup(), parse_mode="Markdown")
     else:
         await callback.message.answer("⚠️ በዳታቤዙ ውስጥ የኮምፒውተር ሳይንስ ጥያቄዎች አልተገኙም!")
 
 
-# 2. የክፍያ ጥያቄ ማሳያ (50 Birr እና የክፍያ አማራጮች)
-async def send_payment_prompt(message: types.Message):
+# 2. የክፍያ ጥያቄ ማሳያ (በተጠቀሱት ትክክለኛ አካውንቶች)
+async def send_payment_prompt(message: types.Message, dept_name: str):
     pay_text = (
         f"🔒 **የነጻ ጥያቄ ገደብዎ አልቋል!**\n\n"
-        f"💰 **ክፍያው 50 Birr ብቻ ነው!**\n"
-        f"ይህን ከከፈሉ ሙሉውን ጥያቄ እና ማብራሪያ ማግኘት ይችላሉ። እባክዎ ከታች ባሉት የክፍያ አማራጮች ክፍያ ይፈጽሙ፡\n\n"
-        f"📱 **Telebirr:** `0919245693` (Negash Wonde)\n"
-        f"🏦 **CBE (Commercial Bank of Ethiopia):** `100268717823` (Negash Wonde)\n\n"
+        f"🎓 ለ **{dept_name}** ሙሉ ጥያቄዎች እና ማብራሪያዎች ክፍያ መፈጸም አለብዎት።\n"
+        f"💰 **ክፍያው 50 Birr ብቻ ነው!**\n\n"
+        f"እባክዎ ከታች ባሉት ኦፊሴላዊ የክፍያ አማራጮች ክፍያ ይፈጽሙ፡\n\n"
+        f"🏦 **CBE (Commercial Bank of Ethiopia):** `1000268717823` (Negash Wonde)\n"
+        f"📱 **Telebirr:** `0919245693` (Negash Wonde)\n\n"
         f"📸 ክፍያ ከፈጸሙ በኋላ **የክፍያ ማረጋገጫ (Screenshot)** ፎቶ ወደዚህ ቦት ይላኩ! አድሚኑ ወዲያውኑ አረጋግጦ ይከፍትልዎታል።"
     )
     builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="📤 Screenshot ልክ (Admin እዲያይ)", callback_data="upload_screenshot_info"))
+    builder.row(types.InlineKeyboardButton(text="📤 Screenshot ልክ (Admin እንዲያይ)", callback_data="upload_screenshot_info"))
     await message.answer(pay_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
@@ -188,7 +191,7 @@ async def handle_payment_screenshot(message: types.Message):
     # አድሚኑን ማሳወቅ እና Approve/Reject ቁልፎችን ማሳየት
     builder = InlineKeyboardBuilder()
     builder.row(
-        types.InlineKeyboardButton(text="✅ Approve (አጽድቅ)", callback_data=f"app_{user_id}"),
+        types.InlineKeyboardButton(text="✅ Approve (አጽድቅ)", callback_data=f"app_{user_id}_cs"),
         types.InlineKeyboardButton(text="❌ Reject (ውድቅ አድርግ)", callback_data=f"rej_{user_id}")
     )
 
@@ -196,7 +199,8 @@ async def handle_payment_screenshot(message: types.Message):
         f"🔔 **አዲስ የክፍያ ማረጋገጫ (Screenshot) መጥቷል!**\n\n"
         f"👤 ስም: {user_name}\n"
         f"🔗 ዩዘርናም: @{username if username else 'N/A'}\n"
-        f"🆔 User ID: `{user_id}`"
+        f"🆔 User ID: `{user_id}`\n"
+        f"📚 የጠየቀው ዲፓርትመንት: Computer Science (CS)"
     )
 
     await bot.send_photo(
@@ -208,31 +212,33 @@ async def handle_payment_screenshot(message: types.Message):
     )
 
 
-# 4. አድሚኑ Approve ሲያደርግ
+# 4. አድሚኑ Approve ሲያደርግ (ለተወሰነ ዲፓርትመንት VIP ማድረግ)
 @dp.callback_query(F.data.startswith("app_"))
 async def admin_approve(callback: types.CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
         await callback.answer("⚠️ ይህንን እርምጃ መውሰድ የሚችለው አድሚኑ ብቻ ነው!", show_alert=True)
         return
 
-    target_user_id = int(callback.data.split("_")[1])
+    parts = callback.data.split("_")
+    target_user_id = int(parts[1])
+    dept_code = parts[2] if len(parts) > 2 else "cs"
 
-    # በዳታቤዝ ውስጥ payment_status ወደ 'paid' መቀየር
+    # በዳታቤዝ ውስጥ payment_status ወደ 'paid' እና paid_department ማስተካከል
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET payment_status = 'paid' WHERE user_id = ?", (target_user_id,))
+    cursor.execute("UPDATE users SET payment_status = 'paid', paid_department = ? WHERE user_id = ?", (dept_code, target_user_id))
     conn.commit()
     conn.close()
 
     await callback.message.edit_caption(caption=callback.message.caption + "\n\n✅ **[STATUS: APPROVED ✅]**",
                                         reply_markup=None)
-    await callback.answer("ክፍያው ጽድቋል!")
+    await callback.answer("ክፍያው ጸድቋል!")
 
     # ለተማሪው መልእክት መላክ
     try:
         await bot.send_message(
             target_user_id,
-            "🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)። አሁን ሙሉውን የ 2018 Exit Exam ጥያቄዎች እና ማብራሪያዎች ያለ ገደብ መሥራት ይችላሉ! 🚀",
+            "🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)። አሁን የኮምፒውተር ሳይንስ (Computer Science) ሙሉ ጥያቄዎች እና ማብራሪያዎች ያለ ገደብ ተከፍተውልዎታል! 🚀",
             parse_mode="Markdown"
         )
     except Exception as e:
@@ -273,15 +279,15 @@ async def check_answer(callback: types.CallbackQuery):
     q_id = parts[1]
     chosen_opt = parts[2]
 
-    # የተጠቃሚውን ነጻ ጥያቄ ብዛት በአንድ መጨመር
+    # የተጠቃሚውን ነጻ ጥያቄ ብዛት በአንድ መጨመር (ክፍያ ካልፈጸመ)
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT free_questions_used, payment_status FROM users WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?", (user_id,))
     res_user = cursor.fetchone()
 
     if res_user:
-        free_used, pay_status = res_user
-        if pay_status != 'paid':
+        free_used, pay_status, paid_dept = res_user
+        if pay_status != 'paid' or paid_dept != 'cs':
             cursor.execute("UPDATE users SET free_questions_used = free_questions_used + 1 WHERE user_id = ?",
                            (user_id,))
             conn.commit()
@@ -372,35 +378,35 @@ async def random_quiz_handler(callback: types.CallbackQuery):
         await callback.message.answer("⚠️ በዳታቤዙ ውስጥ ጥያቄዎች አልተገኙም!")
 
 
-# 9. Tutorial Package (ለኮምፒውተር ሳይንስ 15ቱ ኮርሶች)
+# 9. Tutorial Package (ለኮምፒውተር ሳይንስ PPT/PDF መልክ እና ያለ ክፍያ በቀጥታ የሚከፈት)
 @dp.callback_query(F.data == "tutorial_package")
 async def tutorial_package_handler(callback: types.CallbackQuery):
     await callback.answer()
 
-    courses_text = (
-        "🎓 **Computer Science Tutorial Packages & Core Courses**\n\n"
-        "ይህ ፓኬጅ ለኮምፒውተር ሳይንስ (CS) Exit Exam ተማሪዎች በሙሉ ጥልቀት የተዘጋጀ ሲሆን የሚከተሉትን 15 ዋና ዋና ኮርሶች ይሸፍናል፦\n\n"
-        "1️⃣ Computer Programming\n"
-        "2️⃣ Object-Oriented Programming (OOP)\n"
-        "3️⃣ Database Systems\n"
-        "4️⃣ Computer Organization and Architecture\n"
-        "5️⃣ Data Communication and Computer Networking\n"
-        "6️⃣ Data Structures and Algorithms\n"
-        "7️⃣ Web Programming\n"
-        "8️⃣ Automata and Complexity Theory\n"
-        "9️⃣ Operating Systems\n"
-        "🔟 Software Engineering\n"
-        "1️⃣1️⃣ Design and Analysis of Algorithms\n"
-        "1️⃣2️⃣ Introduction to Artificial Intelligence\n"
-        "1️⃣3️⃣ Computer Security\n"
-        "1️⃣4️⃣ Network and System Administration\n"
-        "1️⃣5️⃣ Compiler Design\n\n"
-        "💡 **ማስታወሻ:** እነዚህ ኮርሶች ለኮምፒውተር ሳይንስ ኤክዚት ፈተና 100% አጋዥ እና ፕሪሚየም ጥያቄዎችን የያዙ ናቸው!"
+    tutorial_text = (
+        "🎓 **Computer Science Exit Exam - Tutorial Package (PPT & PDF Formats)**\n\n"
+        "ይህ የቱቶሪያል ፓኬጅ ለኮምፒውተር ሳይንስ ተማሪዎች በ Exit Exam መመሪያ መሠረት የተዘጋጀ አጭር እና ጥልቅ ማጠቃለያ (Summary) ነው። እነዚህን ማቴሪያሎች ያለ ምንም ክፍያ በቀጥታ ማንበብ ይችላሉ፦\n\n"
+        "📂 **1. Data Structures and Algorithms (PPT/PDF Summary):**\n"
+        "• Array, Linked List, Stack, Queue, Trees, and Graph Traversals.\n"
+        "• Sorting Algorithms (Quick, Merge, Heap) and Time Complexities (Big-O).\n\n"
+        "📂 **2. Database Systems (PPT/PDF Summary):**\n"
+        "• ER Modeling, Relational Algebra, Normalization (1NF, 2NF, 3NF, BCNF).\n"
+        "• SQL Queries, Transactions, and Concurrency Control.\n\n"
+        "📂 **3. Computer Networks (PPT/PDF Summary):**\n"
+        "• OSI & TCP/IP Models, IP Addressing (IPv4/IPv6), Subnetting.\n"
+        "• Routing Protocols (OSPF, BGP) and Network Security (Firewalls, VPN).\n\n"
+        "📂 **4. Operating Systems (PPT/PDF Summary):**\n"
+        "• Process Management, CPU Scheduling Algorithms, Deadlocks.\n"
+        "• Memory Management, Paging, Virtual Memory, and File Systems.\n\n"
+        "📂 **5. Software Engineering & Object-Oriented Programming:**\n"
+        "• SDLC Models (Agile, Scrum, Waterfall), UML Diagrams.\n"
+        "• OOP Principles: Encapsulation, Inheritance, Polymorphism, and Abstraction.\n\n"
+        "💡 **ማስታወሻ:** ተጨማሪ የኮርሶቹ ፒዲኤፍ እና ፓወርፖይንት (PPT) ፋይሎች በቀጣይ በቀጥታ ወደዚህ ቦት ይለቀቃሉ!"
     )
 
     builder = InlineKeyboardBuilder()
     builder.row(types.InlineKeyboardButton(text="🔙 ወደ ዋናው ሜኑ ተመለስ", callback_data="back_menu"))
-    await callback.message.answer(courses_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+    await callback.message.answer(tutorial_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
 # 10. Help ሜኑ
@@ -422,7 +428,7 @@ async def help_handler(callback: types.CallbackQuery):
     await callback.message.answer(help_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# ሌሎች ዲፓርትመንቶች (ለነገ የሚጨመሩ)
+# ሌሎች ዲፓርትመንቶች (ለቀጣይ የሚጨመሩ)
 @dp.callback_query(F.data == "dept_other")
 async def other_dept_handler(callback: types.CallbackQuery):
     await callback.answer()
@@ -450,7 +456,7 @@ async def back_to_menu(callback: types.CallbackQuery):
 async def main():
     init_db()
 
-    # Flask ሰርቨርን ማስጀመር (Render እንዲሰራ)
+    # Flask ሰርቨርን ማስጀመር (Render 24/7 እንዲሠራ)
     flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
