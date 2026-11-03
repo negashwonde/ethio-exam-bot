@@ -23,8 +23,8 @@ def run_flask():
 
 
 # 2. የቴሌግራም ቦት ማዋቀር
-TOKEN = "8523290430:AAGsDLx5iBkYrkCH1JW2QlG2wpbN-O0Omw4"
-ADMIN_ID = 7806847963  # የእርስዎ የአድሚን ቴሌግራም ID
+TOKEN = "8978222008:AAGTKeyntuZrXlWrW3SR-AtoPvE2bD_kLOE"
+ADMIN_ID = 680798556  # የእርስዎ የአድሚን ቴሌግራም ID
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
