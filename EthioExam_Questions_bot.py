@@ -109,7 +109,7 @@ async def cmd_start(message: types.Message):
     await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 1. Computer Science አማራጭ ሲነካ (የ 3 ነጻ ጥያቄዎች ገደብ እና የክፍያ ማረጋገጫ ፍሰት)
+# 1. Computer Science አማራጭ ሲነካ (የ 3 ነጻ ጥያቄዎች ጥብቅ ገደብ)
 @dp.callback_query(F.data == "dept_cs")
 async def start_cs_exam(callback: types.CallbackQuery):
     await callback.answer()
@@ -126,7 +126,7 @@ async def start_cs_exam(callback: types.CallbackQuery):
     pay_status = user_data[1] if user_data else 'free'
     paid_dept = user_data[2] if user_data else ''
 
-    # 3ቱ ነጻ ጥያቄዎች ካለቁ እና ክፍያ ካልፈጸመ ወዲያውኑ የክፍያ ማሳሰቢያ ይሰጣል
+    # ክፍያው ካልተፈጸመ እና 3ቱ ነጻ ጥያቄዎች ካለቁ ወዲያውኑ ክፍያ ይጠይቃል
     if (pay_status != 'paid' or paid_dept != 'cs') and free_used >= 3:
         await send_payment_prompt(callback.message, "Computer Science (CS)")
         return
@@ -212,7 +212,7 @@ async def handle_payment_screenshot(message: types.Message):
     )
 
 
-# 4. አድሚኑ Approve ሲያደርግ (ወደ ዋናው ማውጫ አውቶማቲክ እንዲመለስ የተደረገበት)
+# 4. አድሚኑ Approve ሲያደርግ
 @dp.callback_query(F.data.startswith("app_"))
 async def admin_approve(callback: types.CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
@@ -274,7 +274,7 @@ async def admin_reject(callback: types.CallbackQuery):
         print(f"Error sending message to user: {e}")
 
 
-# 6. መልስ ማረጋገጫ እና Next ቁልፍ ማሳያ
+# 6. መልስ ማረጋገጫ (የነጻ ጥያቄዎች ቁጥር እዚህ ላይ በሰዓቱ ይመዘገባል)
 @dp.callback_query(F.data.startswith("ans_"))
 async def check_answer(callback: types.CallbackQuery):
     await callback.answer()
@@ -292,6 +292,7 @@ async def check_answer(callback: types.CallbackQuery):
 
     if res_user:
         free_used, pay_status, paid_dept = res_user
+        # ክፍያ ካልፈጸመ የነጻ ጥያቄ ብዛት በአንድ ይጨምራል
         if pay_status != 'paid' or paid_dept != 'cs':
             cursor.execute("UPDATE users SET free_questions_used = free_questions_used + 1 WHERE user_id = ?",
                            (user_id,))
@@ -316,15 +317,31 @@ async def check_answer(callback: types.CallbackQuery):
         await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 7. ቀጣይ ጥያቄ (Next Question ሎጂክ)
+# 7. ቀጣይ ጥያቄ (Next Question ሎጂክ - ከ 3 ጥያቄዎች በኋላ ክፍያ የማስጠየቅ ጥብቅ ፍሰት)
 @dp.callback_query(F.data.startswith("next_"))
 async def next_question(callback: types.CallbackQuery):
     await callback.answer()
+    user_id = callback.from_user.id
+
+    # ተጠቃሚው የክፍያ ሁኔታውን ማረጋገጥ
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
+                   (user_id,))
+    user_data = cursor.fetchone()
+
+    free_used = user_data[0] if user_data else 0
+    pay_status = user_data[1] if user_data else 'free'
+    paid_dept = user_data[2] if user_data else ''
+
+    # 3 ነጻ ጥያቄዎች ካለቁ እና ክፍያ ካልፈጸመ Next ሲል ወዲያውኑ የክፍያ ማሳሰቢያ ይሰጣል
+    if (pay_status != 'paid' or paid_dept != 'cs') and free_used >= 3:
+        conn.close()
+        await send_payment_prompt(callback.message, "Computer Science (CS)")
+        return
 
     current_id = int(callback.data.split("_")[1])
 
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
     cursor.execute(
         "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE id > ? AND exam_year = '2018 ጥር' ORDER BY id ASC LIMIT 1",
         (current_id,),
@@ -341,8 +358,9 @@ async def next_question(callback: types.CallbackQuery):
         builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}", callback_data=f"ans_{q_id}_C"))
         builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}", callback_data=f"ans_{q_id}_D"))
 
+        rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - free_used})" if pay_status != 'paid' or paid_dept != 'cs' else " (VIP የተከፈተ 🌟)"
         await callback.message.answer(
-            f"📝 **2018 Exit Exam - Next Question:**\n\n{q_text}",
+            f"📝 **2018 Exit Exam - Next Question{rem_text}:**\n\n{q_text}",
             reply_markup=builder.as_markup(),
             parse_mode="Markdown",
         )
@@ -382,35 +400,35 @@ async def random_quiz_handler(callback: types.CallbackQuery):
         await callback.message.answer("⚠️ በዳታቤዙ ውስጥ ጥያቄዎች አልተገኙም!")
 
 
-# 9. Tutorial Package (ትክክለኛ የማውረጃ ሊንኮች የተካተቱበት)
+# 9. Tutorial Package (ትክክለኛ የቴሌግራም ፖስት ሊንክ የተካተተበት PPT/PDF ፋይሎች ማውረጃ)
 @dp.callback_query(F.data == "tutorial_package")
 async def tutorial_package_handler(callback: types.CallbackQuery):
     await callback.answer()
 
     tutorial_text = (
         "🎓 **Computer Science Exit Exam - Tutorial Package & Downloadable Files**\n\n"
-        "ይህ የቱቶሪያል ፓኬጅ ለኮምፒውተር ሳይንስ ተማሪዎች የተዘጋጀ አጭር እና ጥልቅ ማጠቃለያ ሲሆን፣ ተማሪዎች በቀጥታ ዶክመንቶቹን ሮብ ወይም ዶንሎድ አድርገው እንዲጠቀሙባቸው የተዘጋጁ ፋይሎች እዚህ ይገኛሉ፦\n\n"
+        "ይህ የቱቶሪያል ፓኬጅ ለኮምፒውተር ሳይንስ ተማሪዎች በ Exit Exam መመሪያ መሠረት የተዘጋጀ አጭር እና ጥልቅ ማጠቃለያ ሲሆን፣ ተማሪዎች በቀጥታ ዶክመንቶቹን ሮብ ወይም ዶንሎድ አድርገው እንዲጠቀሙባቸው የተዘጋጁ ፋይሎች እዚህ ይገኛሉ፦\n\n"
         "📂 **1. Data Structures and Algorithms:**\n"
         "• Array, Linked List, Stack, Queue, Trees, Sorting Algorithms (Big-O).\n"
-        "📥 [Download DSA Summary PDF/PPT](https://t.me/neguman19)\n\n"
+        "📥 [Download DSA Summary PPT/PDF](https://t.me/NegashComputerTips/29)\n\n"
         "📂 **2. Database Systems:**\n"
         "• ER Modeling, Normalization (1NF, 2NF, 3NF, BCNF), SQL Queries.\n"
-        "📥 [Download Database Summary PDF/PPT](https://t.me/neguman19)\n\n"
+        "📥 [Download Database Summary PPT/PDF](https://t.me/NegashComputerTips/29)\n\n"
         "📂 **3. Computer Networks:**\n"
         "• OSI & TCP/IP Models, IP Addressing, Subnetting, Routing (OSPF).\n"
-        "📥 [Download Networks Summary PDF/PPT](https://t.me/neguman19)\n\n"
+        "📥 [Download Networks Summary PPT/PDF](https://t.me/NegashComputerTips/29)\n\n"
         "📂 **4. Operating Systems:**\n"
         "• Process Management, CPU Scheduling, Deadlocks, Paging.\n"
-        "📥 [Download OS Summary PDF/PPT](https://t.me/neguman19)\n\n"
+        "📥 [Download OS Summary PPT/PDF](https://t.me/NegashComputerTips/29)\n\n"
         "📂 **5. Software Engineering & OOP:**\n"
         "• SDLC, UML Diagrams, Encapsulation, Inheritance, Polymorphism.\n"
-        "📥 [Download SE & OOP Summary PDF/PPT](https://t.me/neguman19)\n\n"
+        "📥 [Download SE & OOP Summary PPT/PDF](https://t.me/NegashComputerTips/29)\n\n"
         "💡 **ማስታወሻ:** ተጨማሪ አዳዲስ ፒዲኤፍ እና ፓወርፖይንት (PPT) ፋይሎች በቀጥታ ወደዚህ ቦት ይለቀቃሉ!"
     )
 
     builder = InlineKeyboardBuilder()
     builder.row(types.InlineKeyboardButton(text="🔙 ወደ ዋናው ሜኑ ተመለስ", callback_data="back_menu"))
-    await callback.message.answer(tutorial_text, reply_markup=builder.as_markup(), parse_mode="DisableWebPagePreview")
+    await callback.message.answer(tutorial_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
 # 10. Help ሜኑ
