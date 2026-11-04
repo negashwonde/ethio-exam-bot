@@ -212,7 +212,7 @@ async def handle_payment_screenshot(message: types.Message):
     )
 
 
-# 4. አድሚኑ Approve ሲያደርግ
+# 4. አድሚኑ Approve ሲያደርግ (ወደ ዋናው ማውጫ አውቶማቲክ እንዲመለስ የተደረገበት)
 @dp.callback_query(F.data.startswith("app_"))
 async def admin_approve(callback: types.CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
@@ -235,9 +235,16 @@ async def admin_approve(callback: types.CallbackQuery):
     await callback.answer("ክፍያው ጸድቋል!")
 
     try:
+        builder = InlineKeyboardBuilder()
+        builder.row(
+            types.InlineKeyboardButton(text="💻 Computer Science", callback_data="dept_cs"),
+            types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu")
+        )
+
         await bot.send_message(
             target_user_id,
-            "🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)። አሁን የኮምፒውተር ሳይንስ (Computer Science) ሙሉ ጥያቄዎች እና ማብራሪያዎች ያለ ገደብ ተከፍተውልዎታል! 🚀",
+            "🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)። አሁን የኮምፒውተር ሳይንስ (Computer Science) ሙሉ ጥያቄዎች እና ማብራሪያዎች ያለ ገደብ ተከፍተውልዎታል! 🚀\n\n👇 ከታች ባለው ቁልፍ በመጫን መማር ሊጀምሩ ይችላሉ:",
+            reply_markup=builder.as_markup(),
             parse_mode="Markdown"
         )
     except Exception as e:
@@ -445,7 +452,10 @@ async def bookmarks_handler(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data == "back_menu")
 async def back_to_menu(callback: types.CallbackQuery):
-    await callback.message.delete()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
     await cmd_start(callback.message)
 
 
