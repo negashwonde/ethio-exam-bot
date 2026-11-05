@@ -124,7 +124,7 @@ async def cmd_start(message: types.Message):
     await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 1. Computer Science የዓመታት/ወራት ምርጫ ሜኑ (ጥር እና ሰኔ)
+# 1. Computer Science የዓመታት/ወራት ምርጫ ሜኑ
 @dp.callback_query(F.data == "dept_cs_menu")
 async def cs_years_menu(callback: types.CallbackQuery):
     await callback.answer()
@@ -142,7 +142,7 @@ async def cs_years_menu(callback: types.CallbackQuery):
     )
 
 
-# 2. Information Technology የዓመታት/ወራት ምርጫ ሜኑ (ጥር እና ሰኔ)
+# 2. Information Technology የዓመታት/ወራት ምርጫ ሜኑ
 @dp.callback_query(F.data == "dept_it_menu")
 async def it_years_menu(callback: types.CallbackQuery):
     await callback.answer()
@@ -181,6 +181,8 @@ async def start_specific_exam(callback: types.CallbackQuery):
     paid_dept = user_data[2] if user_data else ''
 
     pay_key = f"{subject_code}_{exam_period}"
+
+    # ተጠቃሚው 3 ነጻ ጥያቄዎችን ከጨረሰ እና ክፍያ ካልፈጸመ ወዲያውኑ ክፍያ ይጠይቃል
     if (pay_status != 'paid' or paid_dept != pay_key) and free_used >= 3:
         await send_payment_prompt(callback.message, f"{subject_code} ({exam_period})", pay_key)
         return
@@ -222,7 +224,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
 # 4. የክፍያ ጥያቄ ማሳያ
 async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: str):
     pay_text = (
-        f"🔒 **የነጻ ጥያቄ ገደብዎ አልቋል!**\n\n"
+        f"🔒 **የነጻ ጥያቄ ገደብዎ (3 ጥያቄዎች) አልቋል!**\n\n"
         f"🎓 ለ **{dept_name}** ሙሉ ጥያቄዎች እና ማብራሪያዎች ክፍያ መፈጸም አለብዎት።\n"
         f"💰 **ክፍያው 50 Birr ብቻ ነው!**\n\n"
         f"እባክዎ ከታች ባሉት ኦፊሴላዊ የክፍያ አማራጮች ክፍያ ይፈጽሙ፡\n\n"
@@ -336,7 +338,7 @@ async def admin_reject(callback: types.CallbackQuery):
         print(f"Error: {e}")
 
 
-# 8. መልስ ማረጋገጫ
+# 8. መልስ ማረጋገጫ (የ 3 ነጻ ጥያቄዎች ቆጣሪ እዚህ በትክክል ይሰራል)
 @dp.callback_query(F.data.startswith("ans_"))
 async def check_answer(callback: types.CallbackQuery):
     await callback.answer()
@@ -361,6 +363,7 @@ async def check_answer(callback: types.CallbackQuery):
 
     if res_user:
         free_used, pay_status, paid_dept = res_user
+        # ተጠቃሚው VIP ካልሆነ እና ለዚህ ዲፓርትመንት/ወር ያልከፈለ ከሆነ የነጻ ጥያቄ ቁጥር በአንድ ይጨምራል
         if pay_status != 'paid' or paid_dept != pay_key:
             cursor.execute("UPDATE users SET free_questions_used = free_questions_used + 1 WHERE user_id = ?",
                            (user_id,))
@@ -396,7 +399,7 @@ async def check_answer(callback: types.CallbackQuery):
     await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 9. ቀጣይ ጥያቄ
+# 9. ቀጣይ ጥያቄ (Next Question ሎጂክ ከ 3 ጥያቄዎች ገደብ ጋር)
 @dp.callback_query(F.data.startswith("next_"))
 async def next_question(callback: types.CallbackQuery):
     await callback.answer()
@@ -425,6 +428,7 @@ async def next_question(callback: types.CallbackQuery):
     pay_status = user_data[1] if user_data else 'free'
     paid_dept = user_data[2] if user_data else ''
 
+    # 3ቱ ነጻ ጥያቄዎች ሲያልቁ ወዲያውኑ ክፍያ ይጠይቃል
     if (pay_status != 'paid' or paid_dept != pay_key) and free_used >= 3:
         conn.close()
         await send_payment_prompt(callback.message, f"{subj} ({year})", pay_key)
@@ -564,7 +568,7 @@ async def random_quiz_handler(callback: types.CallbackQuery):
         await callback.message.answer("⚠️ በዳታቤዙ ውስጥ ጥያቄዎች አልተገኙም!")
 
 
-# 14. Tutorial Package (በተጠየቀው መሠረት ንኡስ ምድቦች የተጨመሩበት)
+# 14. Tutorial Package (ንኡስ ምድቦች የተሟሉበት)
 @dp.callback_query(F.data == "tutorial_package")
 async def tutorial_package_handler(callback: types.CallbackQuery):
     await callback.answer()
@@ -587,7 +591,6 @@ async def tutorial_package_handler(callback: types.CallbackQuery):
     )
 
 
-# የ Tutorial Package ንኡስ ምድቦች ሐንድለሮች
 @dp.callback_query(F.data == "tut_cs")
 async def tut_cs_handler(callback: types.CallbackQuery):
     await callback.answer()
