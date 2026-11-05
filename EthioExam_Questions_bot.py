@@ -160,7 +160,7 @@ async def it_years_menu(callback: types.CallbackQuery):
     )
 
 
-# 3. ፈተና መጀመሪያ እና የ 3 ነጻ ጥያቄዎች ጥብቅ ገደብ ማረጋገጫ
+# 3. ፈተና መጀመሪያ (ተማሪው ነጻ 3 ጥያቄዎችን ማየት እንዲችል የመጀመሪያውን መክፈት)
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
@@ -182,11 +182,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
 
     pay_key = f"{subject_code}_{exam_period}"
 
-    # ተጠቃሚው 3 ነጻ ጥያቄዎችን ከጨረሰ እና ክፍያ ካልፈጸመ ወዲያውኑ ክፍያ ይጠይቃል
-    if (pay_status != 'paid' or paid_dept != pay_key) and free_used >= 3:
-        await send_payment_prompt(callback.message, f"{subject_code} ({exam_period})", pay_key)
-        return
-
+    # የመጀመሪያውን ጥያቄ ማምጣት
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
@@ -224,7 +220,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
 # 4. የክፍያ ጥያቄ ማሳያ
 async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: str):
     pay_text = (
-        f"🔒 **የነጻ ጥያቄ ገደብዎ (3 ጥያቄዎች) አልቋል!**\n\n"
+        f"🔒 **3ቱን ነጻ ጥያቄዎች ጨርሰዋል!**\n\n"
         f"🎓 ለ **{dept_name}** ሙሉ ጥያቄዎች እና ማብራሪያዎች ክፍያ መፈጸም አለብዎት።\n"
         f"💰 **ክፍያው 50 Birr ብቻ ነው!**\n\n"
         f"እባክዎ ከታች ባሉት ኦፊሴላዊ የክፍያ አማራጮች ክፍያ ይፈጽሙ፡\n\n"
@@ -338,7 +334,7 @@ async def admin_reject(callback: types.CallbackQuery):
         print(f"Error: {e}")
 
 
-# 8. መልስ ማረጋገጫ (የ 3 ነጻ ጥያቄዎች ቆጣሪ እዚህ በትክክል ይሰራል)
+# 8. መልስ ማረጋገጫ (ተጠቃሚው መልስ ሲልክ የነጻ ጥያቄ ቆጣሪ የሚጨምርበት)
 @dp.callback_query(F.data.startswith("ans_"))
 async def check_answer(callback: types.CallbackQuery):
     await callback.answer()
@@ -399,7 +395,7 @@ async def check_answer(callback: types.CallbackQuery):
     await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 9. ቀጣይ ጥያቄ (Next Question ሎጂክ ከ 3 ጥያቄዎች ገደብ ጋር)
+# 9. ቀጣይ ጥያቄ (3ቱ ነጻ ጥያቄዎች ሙሉ በሙሉ ተጠናቀው 4ተኛው ላይ ሲደርሱ ክፍያ የሚጠይቅበት ትክክለኛ ሎጂክ)
 @dp.callback_query(F.data.startswith("next_"))
 async def next_question(callback: types.CallbackQuery):
     await callback.answer()
@@ -428,7 +424,7 @@ async def next_question(callback: types.CallbackQuery):
     pay_status = user_data[1] if user_data else 'free'
     paid_dept = user_data[2] if user_data else ''
 
-    # 3ቱ ነጻ ጥያቄዎች ሲያልቁ ወዲያውኑ ክፍያ ይጠይቃል
+    # 3ቱ ነጻ ጥያቄዎች ተሠርተው ሲያልቁ (free_used >= 3) 4ተኛው ጥያቄ ላይ ሲደርስ ክፍያ ይጠይቃል
     if (pay_status != 'paid' or paid_dept != pay_key) and free_used >= 3:
         conn.close()
         await send_payment_prompt(callback.message, f"{subj} ({year})", pay_key)
@@ -689,7 +685,7 @@ async def main():
     flask_thread.daemon = True
     flask_thread.start()
     print("🌐 Flask Web Server started successfully on port 8080")
-    print("🚀 WanK Exam Master Bot is running live!")
+    print("🚀 WanK Exam Bot is running live!")
     await dp.start_polling(bot)
 
 
