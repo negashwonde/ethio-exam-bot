@@ -180,13 +180,11 @@ async def start_specific_exam(callback: types.CallbackQuery):
     pay_status = user_data[1] if user_data else 'free'
     paid_dept = user_data[2] if user_data else ''
 
-    # ክፍያው ካልተፈጸመ እና 3ቱ ነጻ ጥያቄዎች ካለቁ ወዲያውኑ ክፍያ ይጠይቃል
     pay_key = f"{subject_code}_{exam_period}"
     if (pay_status != 'paid' or paid_dept != pay_key) and free_used >= 3:
         await send_payment_prompt(callback.message, f"{subject_code} ({exam_period})", pay_key)
         return
 
-    # የመጀመሪያውን ጥያቄ ማምጣት
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
@@ -217,9 +215,8 @@ async def start_specific_exam(callback: types.CallbackQuery):
     else:
         builder = InlineKeyboardBuilder()
         builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
-        await callback.message.answer(
-            f"⚠️ በዳታቤዙ ውስጥ ለ **{subject_code} ({exam_period})** የተመዘገቡ ጥያቄዎች አልተገኙም! እባክዎ ፋይሎቹን ወደ ዳታቤዝ ያስገቡ።",
-            reply_markup=builder.as_markup())
+        await callback.message.answer(f"⚠️ በዳታቤዙ ውስጥ ለ **{subject_code} ({exam_period})** የተመዘገቡ ጥያቄዎች አልተገኙም!",
+                                      reply_markup=builder.as_markup())
 
 
 # 4. የክፍያ ጥያቄ ማሳያ
@@ -567,15 +564,100 @@ async def random_quiz_handler(callback: types.CallbackQuery):
         await callback.message.answer("⚠️ በዳታቤዙ ውስጥ ጥያቄዎች አልተገኙም!")
 
 
-# 14. Tutorial Package
+# 14. Tutorial Package (በተጠየቀው መሠረት ንኡስ ምድቦች የተጨመሩበት)
 @dp.callback_query(F.data == "tutorial_package")
 async def tutorial_package_handler(callback: types.CallbackQuery):
     await callback.answer()
     builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="💻 Computer Science", callback_data="tut_cs"))
+    builder.row(types.InlineKeyboardButton(text="📡 Information Technology", callback_data="tut_it"))
+    builder.row(
+        types.InlineKeyboardButton(text="📚 Freshman (Natural)", callback_data="tut_fresh_nat"),
+        types.InlineKeyboardButton(text="📚 Freshman (Social)", callback_data="tut_fresh_soc")
+    )
+    builder.row(
+        types.InlineKeyboardButton(text="📖 Remedial (Natural)", callback_data="tut_rem_nat"),
+        types.InlineKeyboardButton(text="📖 Remedial (Social)", callback_data="tut_rem_soc")
+    )
+    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+
+    await callback.message.edit_text(
+        "🎓 **Tutorial Package - Categories**\n\nእባክዎ የሚፈልጉትን የትምህርት ዘርፍ ይምረጡ:",
+        reply_markup=builder.as_markup(), parse_mode="Markdown"
+    )
+
+
+# የ Tutorial Package ንኡስ ምድቦች ሐንድለሮች
+@dp.callback_query(F.data == "tut_cs")
+async def tut_cs_handler(callback: types.CallbackQuery):
+    await callback.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text(
-        "🎓 **Tutorial Package**\n\n📥 [Download Summary](https://t.me/NegashComputerTips/29)",
-        reply_markup=builder.as_markup(), parse_mode="Markdown")
+        "💻 **Computer Science Tutorial Package**\n\n📥 [Download CS PPT/PDF](https://t.me/NegashComputerTips/261)",
+        reply_markup=builder.as_markup(), parse_mode="Markdown"
+    )
+
+
+@dp.callback_query(F.data == "tut_it")
+async def tut_it_handler(callback: types.CallbackQuery):
+    await callback.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
+    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+    await callback.message.edit_text(
+        "📡 **Information Technology Tutorial Package**\n\n📥 [Download IT PPT/PDF](https://t.me/NegashComputerTips/261)",
+        reply_markup=builder.as_markup(), parse_mode="Markdown"
+    )
+
+
+@dp.callback_query(F.data == "tut_fresh_nat")
+async def tut_fresh_nat_handler(callback: types.CallbackQuery):
+    await callback.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
+    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+    await callback.message.edit_text(
+        "📚 **Freshman (Natural Science) Tutorial Package**\n\n📥 [Download Natural Science Materials](https://t.me/NegashComputerTips/261)",
+        reply_markup=builder.as_markup(), parse_mode="Markdown"
+    )
+
+
+@dp.callback_query(F.data == "tut_fresh_soc")
+async def tut_fresh_soc_handler(callback: types.CallbackQuery):
+    await callback.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
+    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+    await callback.message.edit_text(
+        "📚 **Freshman (Social Science) Tutorial Package**\n\n📥 [Download Social Science Materials](https://t.me/NegashComputerTips/261)",
+        reply_markup=builder.as_markup(), parse_mode="Markdown"
+    )
+
+
+@dp.callback_query(F.data == "tut_rem_nat")
+async def tut_rem_nat_handler(callback: types.CallbackQuery):
+    await callback.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
+    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+    await callback.message.edit_text(
+        "📖 **Remedial (Natural Science) Tutorial Package**\n\n📥 [Download Remedial Natural Materials](https://t.me/NegashComputerTips/261)",
+        reply_markup=builder.as_markup(), parse_mode="Markdown"
+    )
+
+
+@dp.callback_query(F.data == "tut_rem_soc")
+async def tut_rem_soc_handler(callback: types.CallbackQuery):
+    await callback.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
+    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+    await callback.message.edit_text(
+        "📖 **Remedial (Social Science) Tutorial Package**\n\n📥 [Download Remedial Social Materials](https://t.me/NegashComputerTips/261)",
+        reply_markup=builder.as_markup(), parse_mode="Markdown"
+    )
 
 
 # 15. Help
