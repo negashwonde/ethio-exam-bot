@@ -610,7 +610,7 @@ async def tut_it_handler(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text(
-        "📡 **Information Technology Tutorial Package**\n\n📥 [Download IT PPT/PDF](https://t.me/NegashComputerTips/261)",
+        "📡 **Information Technology Tutorial Package**\n\n📥 [Download IT PPT/PDF](https://t.me/NegashComputerTips/263)",
         reply_markup=builder.as_markup(), parse_mode="Markdown"
     )
 
@@ -622,7 +622,7 @@ async def tut_fresh_nat_handler(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text(
-        "📚 **Freshman (Natural Science) Tutorial Package**\n\n📥 [Download Natural Science Materials](https://t.me/NegashComputerTips/261)",
+        "📚 **Freshman (Natural Science) Tutorial Package**\n\n📥 [Download Natural Science Materials](https://t.me/NegashComputerTips/264)",
         reply_markup=builder.as_markup(), parse_mode="Markdown"
     )
 
@@ -634,7 +634,7 @@ async def tut_fresh_soc_handler(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text(
-        "📚 **Freshman (Social Science) Tutorial Package**\n\n📥 [Download Social Science Materials](https://t.me/NegashComputerTips/261)",
+        "📚 **Freshman (Social Science) Tutorial Package**\n\n📥 [Download Social Science Materials](https://t.me/NegashComputerTips/265)",
         reply_markup=builder.as_markup(), parse_mode="Markdown"
     )
 
@@ -646,7 +646,7 @@ async def tut_rem_nat_handler(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text(
-        "📖 **Remedial (Natural Science) Tutorial Package**\n\n📥 [Download Remedial Natural Materials](https://t.me/NegashComputerTips/261)",
+        "📖 **Remedial (Natural Science) Tutorial Package**\n\n📥 [Download Remedial Natural Materials](https://t.me/NegashComputerTips/266)",
         reply_markup=builder.as_markup(), parse_mode="Markdown"
     )
 
@@ -658,7 +658,7 @@ async def tut_rem_soc_handler(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text(
-        "📖 **Remedial (Social Science) Tutorial Package**\n\n📥 [Download Remedial Social Materials](https://t.me/NegashComputerTips/261)",
+        "📖 **Remedial (Social Science) Tutorial Package**\n\n📥 [Download Remedial Social Materials](https://t.me/NegashComputerTips/266)",
         reply_markup=builder.as_markup(), parse_mode="Markdown"
     )
 
