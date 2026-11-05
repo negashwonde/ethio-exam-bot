@@ -1,0 +1,6 @@
+﻿subject,exam_year,question_text,option_a,option_b,option_c,option_d,correct_answer,explanation
+IT,ሰኔ,Which security triad pillar ensures that information is accessible only to authorized users?,Integrity,Availability,Confidentiality,Authenticity,C,Confidentiality ensures that sensitive data is protected from unauthorized access.
+IT,ሰኔ,"In System Administration, what is the default port number used by HTTPS?",80,21,443,22,C,HTTPS operates on port 443 by default for secure web communications.
+IT,ሰኔ,Which cloud computing service model provides virtualized computing resources over the internet such as VMs and storage?,SaaS,PaaS,IaaS,DaaS,C,"Infrastructure as a Service (IaaS) provides virtual servers, storage, and networking resources."
+IT,ሰኔ,What type of attack involves an attacker placing themselves between two communicating parties to intercept data?,Phishing Attack,Man-in-the-Middle (MitM) Attack,SQL Injection Attack,Denial of Service (DoS) Attack,B,"In a MitM attack, the adversary secretly relays and possibly alters communications between two parties."
+IT,ሰኔ,Which SQL statement is used to modify existing records in a table?,MODIFY,UPDATE,ALTER,CHANGE,B,The UPDATE statement is used to edit existing rows in a database table.

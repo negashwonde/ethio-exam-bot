@@ -1,0 +1,6 @@
+﻿subject,exam_year,question_text,option_a,option_b,option_c,option_d,correct_answer,explanation
+IT,ጥር,Which network topology connects every device to a central hub or switch?,Bus Topology,Ring Topology,Star Topology,Mesh Topology,C,"In a Star topology, all nodes are individually connected to a central connection point like a hub or switch."
+IT,ጥር,Which HTTP request method is used to submit data to be processed to a specified resource?,GET,POST,HEAD,OPTIONS,B,The POST method is used to submit data to a server to create or update a resource.
+IT,ጥር,What is the primary function of Normalization in Database Management Systems?,To increase hardware execution speed,To reduce data redundancy and improve data integrity,To encrypt stored database records,To control network bandwidth usage,B,Normalization organizes data to avoid redundancy and insertion/update/deletion anomalies.
+IT,ጥር,Which component of the operating system directly manages CPU scheduling and process dispatching?,Kernel,Shell,Compiler,File Manager,A,The Kernel manages core system resources including process execution and CPU scheduling.
+IT,ጥር,Which IP address class is reserved for multicast addressing?,Class A,Class B,Class C,Class D,D,Class D IP addresses (224.0.0.0 to 239.255.255.255) are designated for multicast routing.

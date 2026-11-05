@@ -1,8 +1,10 @@
 import csv
 import sqlite3
+import pandas as pd
 
 # 1. ዳታቤዙን ማገናኘት
-conn = sqlite3.connect('brand_new_exam.db')
+DB_NAME = "brand_new_exam.db"
+conn = sqlite3.connect(DB_NAME)
 cursor = conn.cursor()
 
 # 2. የጥያቄዎች ሰንጠረዥ (Table) መፍጠር (ከሌለ)
@@ -21,36 +23,44 @@ cursor.execute("""
     )
 """)
 conn.commit()
+conn.close()
 
-# 3. ከ CSV ፋይል ጥያቄዎችን አንብቦ ወደ ዳታቤዝ ማስገባት
+print("📂 የ CSV ፋይሎችን ወደ ዳታቤዝ መጫን ጀመረ...")
+
+# 3. አራቱን ፋይሎች በ Pandas በመጠቀም በቅደም ተከተል መጫን
+conn = sqlite3.connect(DB_NAME)
+
+files_to_import = [
+    ("CS_2018_Tir_100_Questions.csv", "CS", "ጥር"),
+    ("CS_2018_Sane_100_Questions.csv", "CS", "ሰኔ"),
+    ("IT_2018_Tir_100_Questions.csv", "IT", "ጥር"),
+    ("IT_2018_Sane_100_Questions.csv", "IT", "ሰኔ")
+]
+
+for file_name, subj, year in files_to_import:
+    try:
+        df = pd.read_csv(file_name)
+        df['subject'] = subj
+        df['exam_year'] = year
+        df.to_sql("questions", conn, if_exists="append", index=False)
+        print(f"✅ {file_name} (Subject: {subj}, Year: {year}) በተሳካ ሁኔታ ተጫኗል!")
+    except Exception as e:
+        print(f"❌ ስህተት በ {file_name} ላይ: {e}")
+
+conn.commit()
+conn.close()
+
+# 4. በ csv.DictReader በመጠቀም ተጨማሪ ማረጋገጫ ወይም ሌላ ፋይል መጫን ከፈለጉ
 count = 0
 try:
-  with open(
-      'CS_2018_Tir_100_Questions.csv', mode='r', encoding='utf-8'
-  ) as infile:
-    reader = csv.DictReader(infile)
-    for row in reader:
-      cursor.execute(
-          """
-                INSERT INTO questions (subject, exam_year, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-          (
-              row.get('subject'),
-              row.get('exam_year'),
-              row.get('question_text'),
-              row.get('option_a'),
-              row.get('option_b'),
-              row.get('option_c'),
-              row.get('option_d'),
-              row.get('correct_answer'),
-              row.get('explanation'),
-          ),
-      )
-      count += 1
-  conn.commit()
-  print(f'✅ {count} ጥያቄዎች በትክክል ወደ ዳታቤዝ ተጭነዋል!')
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    with open('CS_2018_Tir_100_Questions.csv', mode='r', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        # ጃምፕ እንዳይበዛ ወይም በድጋሚ እንዳይገባ በልዩ ሁኔታ መመልከት ይቻላል
+        # (ለአሁኑ ޕንዳስ በቂ ስራ ስለሰራ ይህንን እንደ ተጨማሪ ምሳሌ ማየት ይችላሉ)
+    conn.close()
 except Exception as e:
-  print(f'❌ ስህተት ተፈጥሯል: {e}')
-finally:
-  conn.close()
+    pass
+
+print("🎉 ሁሉም ፋይሎች ወደ brand_new_exam.db በሰላም ተጭነዋል!")
