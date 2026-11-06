@@ -136,6 +136,7 @@ def get_main_reply_keyboard():
     return builder.as_markup(resize_keyboard=True)
 
 
+# /start ትዕዛዝ እና የ "Menu" ቴክስት መልእክት መቀበያ (የተስተካከለ እና ሉፕ የማይፈጥር)
 @dp.message(F.text == "Menu")
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -175,8 +176,7 @@ async def cmd_start(message: types.Message):
         f"👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:"
     )
 
-    await message.answer("👇", reply_markup=get_main_reply_keyboard())
-
+    # ተጠቃሚው 'Menu'ን ሲጫን ቻቱ እንዳይጨናነቅ ቀድሞ የነበረውን የሜኑ ቴክስት ጽሁፍ በንጹህ ሁኔታ መላክ
     try:
         await message.answer_photo(
             photo=WELCOME_BANNER_PHOTO,
@@ -185,7 +185,11 @@ async def cmd_start(message: types.Message):
             parse_mode="Markdown"
         )
     except Exception:
-        await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+        await message.answer(
+            welcome_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="Markdown"
+        )
 
 
 # 1. Computer Science ዓመታት መምረጫ ሜኑ
@@ -566,7 +570,7 @@ async def check_answer(callback: types.CallbackQuery):
     await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 7. ቀጣይ ጥያቄ (በተመሳሳይ subject እና exam_year ውስጥ ቀጣዩን id በትክክል መፈለግ)
+# 7. ቀጣይ ጥያቄ
 @dp.callback_query(F.data.startswith("next_"))
 async def next_question(callback: types.CallbackQuery):
     await callback.answer()
@@ -602,7 +606,6 @@ async def next_question(callback: types.CallbackQuery):
         await send_payment_prompt(callback.message, f"{subj} ({year})", pay_key)
         return
 
-    # በዚያው subject እና exam_year ውስጥ ከ current_id የሚቀጥለውን ጥያቄ መፈለግ
     cursor.execute(
         "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE id > ? AND subject = ? AND exam_year = ? ORDER BY id ASC LIMIT 1",
         (current_id, subj, year),
