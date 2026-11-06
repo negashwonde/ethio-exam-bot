@@ -107,10 +107,10 @@ async def cmd_start(message: types.Message):
         types.InlineKeyboardButton(text="🔖 Bookmarks", callback_data="my_bookmarks")
     )
     builder.row(
-        types.InlineKeyboardButton(text="🎓 Tutorial Package (PPT/PDF)", callback_data="tutorial_package")
+        types.InlineKeyboardButton(text="🎓 Documents (PPT/PDF)", callback_data="tutorial_package")
     )
     builder.row(
-        types.InlineKeyboardButton(text="🎲 Random Quiz", callback_data="random_quiz"),
+        types.InlineKeyboardButton(text="🎲 Random Quiz", callback_data="rand_start_1"),
         types.InlineKeyboardButton(text="ℹ️ Help", callback_data="help_menu")
     )
 
@@ -160,14 +160,14 @@ async def it_years_menu(callback: types.CallbackQuery):
     )
 
 
-# 3. ፈተና መጀመሪያ - ተጠቃሚው ክፍያ ከፈጸመ ወይም 3 ነጻ ጥያቄዎች ካሉት መጀመር ይችላል
+# 3. ፈተና መጀመሪያ
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
     user_id = callback.from_user.id
     parts = callback.data.split("_")
-    subject_code = parts[2]  # CS ወይም IT
-    exam_period = parts[3]  # ጥር ወይም ሰኔ
+    subject_code = parts[2]
+    exam_period = parts[3]
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -182,12 +182,10 @@ async def start_specific_exam(callback: types.CallbackQuery):
 
     pay_key = f"{subject_code}_{exam_period}"
 
-    # 3ቱ ነጻ ጥያቄዎች አልቀው ክፍያ ካልፈጸመ ወደ ፈተና እንዳይገባ ይገደዳል
     if (pay_status != 'paid' or paid_dept != pay_key) and free_used >= 3:
         await send_payment_prompt(callback.message, f"{subject_code} ({exam_period})", pay_key)
         return
 
-    # የመጀመሪያውን ጥያቄ ማምጣት
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
@@ -339,7 +337,7 @@ async def admin_reject(callback: types.CallbackQuery):
         print(f"Error: {e}")
 
 
-# 8. መልስ ማረጋገጫ (ተጠቃሚው ጥያቄ መርጦ መልስ ሲልክ የነጻ ጥያቄ ቆጣሪ የሚጨምርበት)
+# 8. መልስ ማረጋገጫ
 @dp.callback_query(F.data.startswith("ans_"))
 async def check_answer(callback: types.CallbackQuery):
     await callback.answer()
@@ -364,7 +362,6 @@ async def check_answer(callback: types.CallbackQuery):
 
     if res_user:
         free_used, pay_status, paid_dept = res_user
-        # ተጠቃሚው ክፍያ ካልፈጸመ የነጻ ጥያቄ ቆጣሪ በአንድ ይጨምራል
         if pay_status != 'paid' or paid_dept != pay_key:
             cursor.execute("UPDATE users SET free_questions_used = free_questions_used + 1 WHERE user_id = ?",
                            (user_id,))
@@ -400,7 +397,7 @@ async def check_answer(callback: types.CallbackQuery):
     await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 9. ቀጣይ ጥያቄ (3ቱ ነጻ ጥያቄዎች አልቀው 4ተኛው ላይ ሲደርሱ ክፍያ የሚጠይቅ ትክክለኛ ሎጂክ)
+# 9. ቀጣይ ጥያቄ
 @dp.callback_query(F.data.startswith("next_"))
 async def next_question(callback: types.CallbackQuery):
     await callback.answer()
@@ -429,7 +426,6 @@ async def next_question(callback: types.CallbackQuery):
     pay_status = user_data[1] if user_data else 'free'
     paid_dept = user_data[2] if user_data else ''
 
-    # 3ቱ ነጻ ጥያቄዎች ተሠርተው ሲያልቁ (free_used >= 3) ክፍያ ካልፈጸመ ወደ ቀጣዩ ጥያቄ እንዳያልፍ ተደርጎ ክፍያ ይጠየቃል
     if (pay_status != 'paid' or paid_dept != pay_key) and free_used >= 3:
         conn.close()
         await send_payment_prompt(callback.message, f"{subj} ({year})", pay_key)
@@ -541,32 +537,64 @@ async def progress_handler(callback: types.CallbackQuery):
     await callback.message.edit_text(progress_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 13. Random Quiz
-@dp.callback_query(F.data == "random_quiz")
-async def random_quiz_handler(callback: types.CallbackQuery):
+# 13. Random Quiz (በምስሉ ላይ እንዳለው 10 ጥያቄዎችን በቅደም ተከተል የሚያሳይ ነጻ ሎጂክ)
+@dp.callback_query(F.data.startswith("rand_start_"))
+async def random_quiz_start(callback: types.CallbackQuery):
     await callback.answer()
+    q_num = int(callback.data.split("_")[2])
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions ORDER BY RANDOM() LIMIT 1")
+        "SELECT id, subject, exam_year, question_text, option_a, option_b, option_c, option_d FROM questions ORDER BY RANDOM() LIMIT 1")
     q = cursor.fetchone()
     conn.close()
 
     if q:
-        q_id, q_text, opt_a, opt_b, opt_c, opt_d = q
+        q_id, subj, year, q_text, opt_a, opt_b, opt_c, opt_d = q
         builder = InlineKeyboardBuilder()
-        builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}", callback_data=f"ans_{q_id}_A"))
-        builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}", callback_data=f"ans_{q_id}_B"))
-        builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}", callback_data=f"ans_{q_id}_C"))
-        builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}", callback_data=f"ans_{q_id}_D"))
-        builder.row(
-            types.InlineKeyboardButton(text="🔖 Bookmark", callback_data=f"bm_{q_id}"),
-            types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu")
-        )
-        await callback.message.answer(f"🎲 **Random Quiz:**\n\n{q_text}", reply_markup=builder.as_markup(),
-                                      parse_mode="Markdown")
+        builder.row(types.InlineKeyboardButton(text=f"A. {opt_a}", callback_data=f"rand_ans_{q_num}_{q_id}_A"))
+        builder.row(types.InlineKeyboardButton(text=f"B. {opt_b}", callback_data=f"rand_ans_{q_num}_{q_id}_B"))
+        builder.row(types.InlineKeyboardButton(text=f"C. {opt_c}", callback_data=f"rand_ans_{q_num}_{q_id}_C"))
+        builder.row(types.InlineKeyboardButton(text=f"D. {opt_d}", callback_data=f"rand_ans_{q_num}_{q_id}_D"))
+        builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+
+        header_text = f"🎲 **Random Quiz — {q_num}/10**\nSource: {subj} ({year}) Q{q_id}  Score: 0/0\n\n"
+        await callback.message.answer(header_text + q_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
     else:
         await callback.message.answer("⚠️ በዳታቤዙ ውስጥ ጥያቄዎች አልተገኙም!")
+
+
+@dp.callback_query(F.data.startswith("rand_ans_"))
+async def random_quiz_answer(callback: types.CallbackQuery):
+    await callback.answer()
+    parts = callback.data.split("_")
+    q_num = int(parts[2])
+    q_id = int(parts[3])
+    chosen_opt = parts[4]
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT correct_answer, explanation, subject, exam_year FROM questions WHERE id = ?", (q_id,))
+    res = cursor.fetchone()
+    conn.close()
+
+    if res:
+        correct, explanation, subj, year = res
+        if chosen_opt == correct:
+            res_txt = "✅ **ትክክል ነው! (Correct)**"
+        else:
+            res_txt = f"❌ **ስህተት ነው። ትክክለኛው መልስ: {correct}**"
+
+        builder = InlineKeyboardBuilder()
+        if q_num < 10:
+            builder.row(types.InlineKeyboardButton(text="➡️ Next Question (ቀጣይ)", callback_data=f"rand_start_{q_num + 1}"))
+        else:
+            builder.row(types.InlineKeyboardButton(text="🎉 ቪዩ አጠቃላይ ውጤት", callback_data="back_menu"))
+        builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+
+        feedback = f"{res_txt}\n\n💡 **ማብራሪያ (Explanation):**\n{explanation}"
+        await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
 # 14. Tutorial Package (ንኡስ ምድቦች የተሟሉበት)
@@ -671,7 +699,7 @@ async def help_handler(callback: types.CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text("ℹ️ **Help & Support**\n📞 Phone: `0919245693`\nTelegram: @neguRoha",
-                                     reply_markup=builder.as_markup(), parse_Mode="Markdown")
+                                     reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
 # 16. Back Menu
@@ -690,7 +718,7 @@ async def main():
     flask_thread.daemon = True
     flask_thread.start()
     print("🌐 Flask Web Server started successfully on port 8080")
-    print("🚀 WanK Exam Master Bot is running live!")
+    print("🚀 WanK Exam Bot is running live!")
     await dp.start_polling(bot)
 
 
