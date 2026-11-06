@@ -107,30 +107,35 @@ async def cmd_start(message: types.Message):
     conn.close()
 
     builder = InlineKeyboardBuilder()
+    # ልክ እንደ ላኩልኝ ምስል በጎን በኩል በሁለት ረድፍ የተደረደሩ ቁልፎች
     builder.row(
-        types.InlineKeyboardButton(text="💻 Computer Science", callback_data="dept_cs_menu"),
-        types.InlineKeyboardButton(text="📡 Information Technology", callback_data="dept_it_menu")
+        types.InlineKeyboardButton(text="💻 Computer Science  >", callback_data="dept_cs_menu"),
+        types.InlineKeyboardButton(text="📡 Information Technology  >", callback_data="dept_it_menu")
     )
     builder.row(
-        types.InlineKeyboardButton(text="📊 My Progress", callback_data="my_progress"),
-        types.InlineKeyboardButton(text="🔖 Bookmarks", callback_data="my_bookmarks")
+        types.InlineKeyboardButton(text="📊 My Progress  >", callback_data="my_progress"),
+        types.InlineKeyboardButton(text="🔖 Bookmarks  >", callback_data="my_bookmarks")
     )
     builder.row(
-        types.InlineKeyboardButton(text="📚 Documents (PPT/PDF)", callback_data="tutorial_package")
+        types.InlineKeyboardButton(text="📄 Documents (PPT/PDF)  >", callback_data="tutorial_package"),
+        types.InlineKeyboardButton(text="🎲 Random Quiz  >", callback_data="rand_start_1_0")
     )
     builder.row(
-        types.InlineKeyboardButton(text="🎲 Random Quiz", callback_data="rand_start_1_0"),
-        types.InlineKeyboardButton(text="❓ Help & Support", callback_data="help_menu")
+        types.InlineKeyboardButton(text="❓ Help & Support  >", callback_data="help_menu"),
+        types.InlineKeyboardButton(text="ℹ️ About Bot  >", callback_data="about_bot")
     )
 
     welcome_text = (
-        f"👋 **ሰላም {user_name}!**\n\n"
-        f"🎓 **ወደ WankExamBot እንኳን ደህና መጡ።**\n"
-        f"ለኮምፒውተር ሳይንስ (CS), ለአይቲ (IT), Freshman and Remedial ጥያቄዎች እና ማብራሪያዎች እዚህ ያገኛሉ።\n\n"
-        f"👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:"
+        f"👋 **Welcome to WankExamBot!**\n"
+        f"Your smart exam assistant for\n"
+        f"**Computer Science & Information Technology.** 💻\n\n"
+        f"✅ Take quizzes and practice exams\n"
+        f"✅ Track your progress\n"
+        f"✅ Save your favorite topics\n\n"
+        f"🚀 **Let's get started! Choose a menu below:**"
     )
 
-    await message.answer(welcome_text, reply_markup=get_main_reply_keyboard())
+    await message.answer(welcome_text, reply_markup=get_main_reply_keyboard(), parse_mode="Markdown")
     await message.answer("👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:", reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
@@ -709,7 +714,25 @@ async def help_handler(callback: types.CallbackQuery):
                                      reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 16. Back Menu
+# 16. About Bot
+@dp.callback_query(F.data == "about_bot")
+async def about_bot_handler(callback: types.CallbackQuery):
+    await callback.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+    await callback.message.edit_text(
+        "🤖 **About WankExamBot**\n\n"
+        "🎓 WankExamBot is your smart exam assistant designed to help Computer Science, IT, Freshman, and Remedial students prepare effectively for their exit and placement examinations.\n\n"
+        "✨ Features:\n"
+        "• Practice real exam questions with instant feedback\n"
+        "• Track your progress and save bookmarks\n"
+        "• Access comprehensive study documents",
+        reply_markup=builder.as_markup(),
+        parse_mode="Markdown"
+    )
+
+
+# 17. Back Menu
 @dp.callback_query(F.data == "back_menu")
 async def back_to_menu(callback: types.CallbackQuery):
     try:
