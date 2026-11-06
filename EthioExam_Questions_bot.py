@@ -33,7 +33,6 @@ dp = Dispatcher()
 DB_NAME = "brand_new_exam.db"
 
 # የባነር ፎቶ File ID (እዚህ ጋር የፎቶዎን file_id ወይም ሊንክ ያስገቡ)
-# ማስታወሻ: ቦቱ ላይ ፎቶውን በመላክ የፎቶውን file_id ማግኘት ይችላሉ፣ ወይም ከታች ባለው ቦታ ዩአርኤል (URL) ማስገባት ይቻላል።
 WELCOME_BANNER_PHOTO = "YOUR_PHOTO_FILE_ID_OR_URL_HERE"
 
 
@@ -135,10 +134,8 @@ async def cmd_start(message: types.Message):
         f"👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:"
     )
 
-    # 1. መጀመሪያ ሰማያዊውን የ Reply Keyboard (Menu) ከታች በግራ በኩል እንዲታይ ይልካል
-    await message.answer("👇 ከታች በግራ በኩል ያለውን የ **Menu** ቁልፍ በመጫን ቦቱን ማስኬድ ይችላሉ:", reply_markup=get_main_reply_keyboard())
+    await message.answer("👇", reply_markup=get_main_reply_keyboard())
 
-    # 2. ከላይ የጠየቁትን ባነር ፎቶ ከጽሁፉ እና ከ Inline ቁልፎች ጋር አንድ ላይ ይልካል
     try:
         await message.answer_photo(
             photo=WELCOME_BANNER_PHOTO,
@@ -147,7 +144,6 @@ async def cmd_start(message: types.Message):
             parse_mode="Markdown"
         )
     except Exception:
-        # ፎቶው በትክክል ካልተገኘ ጽሁፉን ብቻ በቁልፎቹ ይልካል (ቦቱ እንዳይበላሽ)
         await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
@@ -187,7 +183,7 @@ async def it_years_menu(callback: types.CallbackQuery):
     )
 
 
-# 3. ፈተና መጀመሪያ
+# 3. ፈተና መጀመሪያ (የተከፈተለትን ቼክ ማድረግ)
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
@@ -205,11 +201,14 @@ async def start_specific_exam(callback: types.CallbackQuery):
 
     free_used = user_data[0] if user_data else 0
     pay_status = user_data[1] if user_data else 'free'
-    paid_dept = user_data[2] if user_data else ''
+    paid_depts = user_data[2] if user_data else ''
 
     pay_key = f"{subject_code}_{exam_period}"
 
-    if (pay_status != 'paid' or paid_dept != pay_key) and free_used >= 3:
+    # ተጠቃሚው ክፍሉን ከፍቶታል ወይስ አልከፈተም የሚለውን ማረጋገጫ (ብዙ ክፍሎችን መያዝ እንዲችል check ይደረጋል)
+    is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
+
+    if not is_paid_for_this and free_used >= 3:
         await send_payment_prompt(callback.message, f"{subject_code} ({exam_period})", pay_key)
         return
 
@@ -235,7 +234,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
             types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu")
         )
 
-        rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - free_used})" if pay_status != 'paid' or paid_dept != pay_key else " (VIP የተከፈተ 🌟)"
+        rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - free_used})" if not is_paid_for_this else " (VIP የተከፈተ 🌟)"
         await callback.message.answer(
             f"📝 **{subject_code} ({exam_period}) Exit Exam - Q1{rem_text}:**\n\n{q_text}",
             reply_markup=builder.as_markup(), parse_mode="Markdown"
@@ -272,7 +271,7 @@ async def screenshot_info(callback: types.CallbackQuery):
         "📸 እባክዎ የክፍያ ማረጋገጫ (Screenshot) ምስል በቀጥታ በዚህ ቻት ውስጥ ፎቶውን ይላኩ። አድሚኑ ወዲያውኑ አረጋግጦ ይከፍትልዎታል!")
 
 
-# 5. ተማሪዎች የሚልኩትን የክፍያ ስክሪንሾት መቀበል
+# 5. ተማሪዎች የሚልኩትን የክፍያ ስክሪንሾት መቀበል (ለአድሚኑ Multi-select ማሳየት)
 @dp.message(F.photo)
 async def handle_payment_screenshot(message: types.Message):
     user_id = message.from_user.id
@@ -283,21 +282,24 @@ async def handle_payment_screenshot(message: types.Message):
     await message.answer("📥 **የክፍያ ስክሪንሾትዎ ደርሷል!** አድሚኑ እስኪያረጋግጠው በጥቂት ደቂቃዎች ውስጥ ይጠብቁ።")
 
     builder = InlineKeyboardBuilder()
+    # አድሚኑ ከሁለት ወይም ከሶስት በላይ በአንድ ጊዜ መርጦ ማጽደቅ እንዲችል
     builder.row(
-        types.InlineKeyboardButton(text="✅ CS - ጥር", callback_data=f"app_{user_id}_CS_ጥር"),
-        types.InlineKeyboardButton(text="✅ CS - ሰኔ", callback_data=f"app_{user_id}_CS_ሰኔ")
+        types.InlineKeyboardButton(text="☑️ CS - ጥር", callback_data=f"toggle_{user_id}_CS_ጥር"),
+        types.InlineKeyboardButton(text="☑️ CS - ሰኔ", callback_data=f"toggle_{user_id}_CS_ሰኔ")
     )
     builder.row(
-        types.InlineKeyboardButton(text="✅ IT - ጥር", callback_data=f"app_{user_id}_IT_ጥር"),
-        types.InlineKeyboardButton(text="✅ IT - ሰኔ", callback_data=f"app_{user_id}_IT_ሰኔ")
+        types.InlineKeyboardButton(text="☑️ IT - ጥር", callback_data=f"toggle_{user_id}_IT_ጥር"),
+        types.InlineKeyboardButton(text="☑️ IT - ሰኔ", callback_data=f"toggle_{user_id}_IT_ሰኔ")
     )
+    builder.row(types.InlineKeyboardButton(text="🚀 የተመረጡትን አጽድቅ (Approve)", callback_data=f"finalize_app_{user_id}"))
     builder.row(types.InlineKeyboardButton(text="❌ Reject", callback_data=f"rej_{user_id}"))
 
     admin_caption = (
         f"🔔 **አዲስ የክፍያ ማረጋገጫ መጥቷል!**\n\n"
         f"👤 ስም: {user_name}\n"
         f"🔗 ዩዘርናም: @{username if username else 'N/A'}\n"
-        f"🆔 User ID: `{user_id}`"
+        f"🆔 User ID: `{user_id}`\n\n"
+        f"📌 *እባክዎ የሚፈልጉትን ፈተና/ክፍል ከላይ በመንካት (እየመረጡ) ከዛ 'የተመረጡትን አጽድቅ' የሚለውን ይጫኑ።*"
     )
 
     await bot.send_photo(
@@ -309,36 +311,80 @@ async def handle_payment_screenshot(message: types.Message):
     )
 
 
-# 6. አድሚኑ Approve ሲያደርግ
-@dp.callback_query(F.data.startswith("app_"))
-async def admin_approve(callback: types.CallbackQuery):
+# የትኞቹ ክፍሎች እንደተመረጡ በጊዜያዊነት መያዣ (Dictionary)
+admin_selections = {}
+
+
+@dp.callback_query(F.data.startswith("toggle_"))
+async def admin_toggle_selection(callback: types.CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
-        await callback.answer("⚠️ አድሚኑ ብቻ ነው ይህንን ማድረግ የሚችለው!", show_alert=True)
+        await callback.answer("⚠️ አድሚኑ ብቻ ነው!", show_alert=True)
         return
 
     parts = callback.data.split("_")
     target_user_id = int(parts[1])
-    subj_code = parts[2]
+    dept_code = parts[2]
     period = parts[3]
-    pay_key = f"{subj_code}_{period}"
+    key = f"{dept_code}_{period}"
+
+    if target_user_id not in admin_selections:
+        admin_selections[target_user_id] = set()
+
+    if key in admin_selections[target_user_id]:
+        admin_selections[target_user_id].remove(key)
+        await callback.answer(f"❌ {key} ተሰርዟል")
+    else:
+        admin_selections[target_user_id].add(key)
+        await callback.answer(f"✅ {key} ተመርጧል")
+
+
+# አድሚኑ መርጦ ጨርሶ ሲያጸድቅ (Finalize Approve)
+@dp.callback_query(F.data.startswith("finalize_app_"))
+async def admin_finalize_approve(callback: types.CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("⚠️ አድሚኑ ብቻ ነው!", show_alert=True)
+        return
+
+    target_user_id = int(callback.data.split("_")[2])
+    selected_keys = admin_selections.get(target_user_id, set())
+
+    if not selected_keys:
+        await callback.answer("⚠️ እባክዎ ቢያንስ አንድ ኮርስ/ወር ይምረጡ!", show_alert=True)
+        return
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+
+    # የያዛቸውን የቀድሞ የተከፈቱ ክፍሎች ማምጣት
+    cursor.execute("SELECT paid_department FROM users WHERE user_id = ?", (target_user_id,))
+    res = cursor.fetchone()
+    existing_depts = res[0].split(",") if res and res[0] else []
+
+    # አዲሶቹን መደመር (Duplicate እንዳይሆን set መጠቀም)
+    combined_depts = set(existing_depts).union(selected_keys)
+    new_paid_str = ",".join(filter(None, combined_depts))
+
     cursor.execute("UPDATE users SET payment_status = 'paid', paid_department = ? WHERE user_id = ?",
-                   (pay_key, target_user_id))
+                   (new_paid_str, target_user_id))
     conn.commit()
     conn.close()
 
-    await callback.message.edit_caption(caption=callback.message.caption + f"\n\n✅ **[APPROVED: {pay_key} ✅]**",
-                                        reply_markup=None)
-    await callback.answer("ክፍያው ጸድቋል!")
+    # ከዲክሽነሪ ማጽዳት
+    if target_user_id in admin_selections:
+        del admin_selections[target_user_id]
+
+    await callback.message.edit_caption(
+        caption=callback.message.caption + f"\n\n✅ **[APPROVED: {', '.join(selected_keys)} ✅]**",
+        reply_markup=None
+    )
+    await callback.answer("ክፍያው በተሳካ ሁኔታ ጸድቋል!")
 
     try:
         builder = InlineKeyboardBuilder()
         builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
         await bot.send_message(
             target_user_id,
-            f"🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)። አሁን የ **{subj_code} ({period})** ሙሉ ጥያቄዎች ተከፍተውልዎታል! 🚀",
+            f"🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)። አሁን የተመረጡት ሙሉ ጥያቄዎች ተከፍተውልዎታል! 🚀",
             reply_markup=builder.as_markup(),
             parse_mode="Markdown"
         )
@@ -346,7 +392,7 @@ async def admin_approve(callback: types.CallbackQuery):
         print(f"Error sending message to user: {e}")
 
 
-# 7. አድሚኑ Reject ሲያደርግ
+# 6. አድሚኑ Reject ሲያደርግ
 @dp.callback_query(F.data.startswith("rej_"))
 async def admin_reject(callback: types.CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
@@ -354,6 +400,9 @@ async def admin_reject(callback: types.CallbackQuery):
         return
 
     target_user_id = int(callback.data.split("_")[1])
+    if target_user_id in admin_selections:
+        del admin_selections[target_user_id]
+
     await callback.message.edit_caption(caption=callback.message.caption + "\n\n❌ **[REJECTED ❌]**", reply_markup=None)
     await callback.answer("ውድቅ ተደርጓል!")
 
@@ -364,7 +413,7 @@ async def admin_reject(callback: types.CallbackQuery):
         print(f"Error: {e}")
 
 
-# 8. መልስ ማረጋገጫ
+# 7. መልስ ማረጋገጫ
 @dp.callback_query(F.data.startswith("ans_"))
 async def check_answer(callback: types.CallbackQuery):
     await callback.answer()
@@ -388,8 +437,9 @@ async def check_answer(callback: types.CallbackQuery):
         pay_key = f"{q_info[0]}_{q_info[1]}"
 
     if res_user:
-        free_used, pay_status, paid_dept = res_user
-        if pay_status != 'paid' or paid_dept != pay_key:
+        free_used, pay_status, paid_depts = res_user
+        is_paid = pay_status == 'paid' and pay_key in paid_depts.split(",")
+        if not is_paid:
             cursor.execute("UPDATE users SET free_questions_used = free_questions_used + 1 WHERE user_id = ?",
                            (user_id,))
             conn.commit()
@@ -424,7 +474,7 @@ async def check_answer(callback: types.CallbackQuery):
     await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 9. ቀጣይ ጥያቄ
+# 8. ቀጣይ ጥያቄ
 @dp.callback_query(F.data.startswith("next_"))
 async def next_question(callback: types.CallbackQuery):
     await callback.answer()
@@ -451,9 +501,11 @@ async def next_question(callback: types.CallbackQuery):
 
     free_used = user_data[0] if user_data else 0
     pay_status = user_data[1] if user_data else 'free'
-    paid_dept = user_data[2] if user_data else ''
+    paid_depts = user_data[2] if user_data else ''
 
-    if (pay_status != 'paid' or paid_dept != pay_key) and free_used >= 3:
+    is_paid = pay_status == 'paid' and pay_key in paid_depts.split(",")
+
+    if not is_paid and free_used >= 3:
         conn.close()
         await send_payment_prompt(callback.message, f"{subj} ({year})", pay_key)
         return
@@ -478,7 +530,7 @@ async def next_question(callback: types.CallbackQuery):
             types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu")
         )
 
-        rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - free_used})" if pay_status != 'paid' or paid_dept != pay_key else " (VIP የተከፈተ 🌟)"
+        rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - free_used})" if not is_paid else " (VIP የተከፈተ 🌟)"
         await callback.message.answer(
             f"📝 **{subj} ({year}) - Next Question{rem_text}:**\n\n{q_text}",
             reply_markup=builder.as_markup(),
@@ -491,7 +543,7 @@ async def next_question(callback: types.CallbackQuery):
                                       reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 10. Bookmark
+# 9. Bookmark
 @dp.callback_query(F.data.startswith("bm_"))
 async def bookmark_question(callback: types.CallbackQuery):
     user_id = callback.from_user.id
@@ -508,7 +560,7 @@ async def bookmark_question(callback: types.CallbackQuery):
     conn.close()
 
 
-# 11. Bookmarks List
+# 10. Bookmarks List
 @dp.callback_query(F.data == "my_bookmarks")
 async def show_bookmarks(callback: types.CallbackQuery):
     await callback.answer()
@@ -539,7 +591,7 @@ async def show_bookmarks(callback: types.CallbackQuery):
     await callback.message.edit_text(bm_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 12. Progress
+# 11. Progress
 @dp.callback_query(F.data == "my_progress")
 async def progress_handler(callback: types.CallbackQuery):
     await callback.answer()
@@ -564,7 +616,7 @@ async def progress_handler(callback: types.CallbackQuery):
     await callback.message.edit_text(progress_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 13. Random Quiz
+# 12. Random Quiz
 @dp.callback_query(F.data.startswith("rand_start_"))
 async def random_quiz_start(callback: types.CallbackQuery):
     await callback.answer()
@@ -628,7 +680,7 @@ async def random_quiz_answer(callback: types.CallbackQuery):
         await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 14. Tutorial Package
+# 13. Tutorial Package
 @dp.callback_query(F.data == "tutorial_package")
 async def tutorial_package_handler(callback: types.CallbackQuery):
     await callback.answer()
@@ -714,7 +766,6 @@ async def tut_rem_nat_handler(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "tut_rem_soc")
 async def tut_rem_soc_handler(callback: types.CallbackQuery):
     await callback.answer()
-    builder = InlineKeyboard_builder = InlineKeyboardBuilder()
     builder = InlineKeyboardBuilder()
     builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
@@ -724,7 +775,7 @@ async def tut_rem_soc_handler(callback: types.CallbackQuery):
     )
 
 
-# 15. Help
+# 14. Help
 @dp.callback_query(F.data == "help_menu")
 async def help_handler(callback: types.CallbackQuery):
     await callback.answer()
@@ -734,7 +785,7 @@ async def help_handler(callback: types.CallbackQuery):
                                      reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 16. About Bot
+# 15. About Bot
 @dp.callback_query(F.data == "about_bot")
 async def about_bot_handler(callback: types.CallbackQuery):
     await callback.answer()
@@ -752,7 +803,7 @@ async def about_bot_handler(callback: types.CallbackQuery):
     )
 
 
-# 17. Back Menu
+# 16. Back Menu
 @dp.callback_query(F.data == "back_menu")
 async def back_to_menu(callback: types.CallbackQuery):
     try:
