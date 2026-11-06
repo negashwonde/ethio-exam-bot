@@ -99,12 +99,13 @@ def load_all_exam_datasets():
 
     conn = sqlite3.connect(DB_NAME)
 
+    # እዚህ ጋር ዓመቱ እና ወሩ በትክክል (ለምሳሌ '2017_ጥር') እንዲቀመጡ ተስተካክለዋል
     files_to_import = [
         ("CS_2017_Tir_100_Unique_Final.csv", "CS", "2017_ጥር"),
         ("CS_2017_Sane_100_Unique_Final.csv", "CS", "2017_ሰኔ"),
         ("IT_2017_Tir_100_Unique_Final.csv", "IT", "2017_ጥር"),
         ("IT_2017_Sane_100_Unique_Final.csv", "IT", "2017_ሰኔ"),
-        ("CS_2018_T100_Questions_Distinct.csv", "CS", "2018_ጥር"),
+        ("CS_2018_Tir_100_Questions_Distinct.csv", "CS", "2018_ጥር"),
         ("CS_2018_Sane_100_Questions_Distinct.csv", "CS", "2018_ሰኔ"),
         ("IT_2018_Tir_100_Questions_Distinct.csv", "IT", "2018_ጥር"),
         ("IT_2018_Sane_100_Questions_Distinct.csv", "IT", "2018_ሰኔ")
@@ -128,7 +129,7 @@ def load_all_exam_datasets():
     print("🎉 ሁሉም የ 2017 እና 2018 የጥር እና ሰኔ ጥያቄዎች ተጭነዋል!")
 
 
-# /start ትዕዛዝ (Reply ኪቦርድ ሙሉ በሙሉ ተወግዷል፣ በኢንላይን ብቻ ይሠራል)
+# /start ትዕዛዝ (በኢንላይን ኪቦርድ ብቻ የሚሰራ)
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
@@ -313,7 +314,6 @@ async def start_specific_exam(callback: types.CallbackQuery):
     pay_key = f"{subject_code}_{full_exam_year}"
     is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
-    # 3ቱን ነጻ ጥያቄዎች ካጠናቀቀ እና ክፍያ ካልፈጸመ ክፍያ ይጠይቃል
     if not is_paid_for_this and free_used >= 3:
         await send_payment_prompt(callback.message, f"{subject_code} ({year_val} {month_val})", pay_key)
         return
@@ -583,7 +583,7 @@ async def check_answer(callback: types.CallbackQuery):
     await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 7. ቀጣይ ጥያቄ (Next Question) - በቅደም ተከተል እንዲሰራ የተስተካከለ
+# 7. ቀጣይ ጥያቄ (Next Question) - ያለ ማቋረጥ ቀጣዩን ጥያቄ ለማምጣት የተስተካከለ
 @dp.callback_query(F.data.startswith("next_"))
 async def next_question(callback: types.CallbackQuery):
     await callback.answer()
@@ -619,6 +619,7 @@ async def next_question(callback: types.CallbackQuery):
         await send_payment_prompt(callback.message, f"{subj} ({year})", pay_key)
         return
 
+    # በዚያው subject እና exam_year ውስጥ ከ current_id የሚቀጥለውን ጥያቄ መፈለግ
     cursor.execute(
         "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE id > ? AND subject = ? AND exam_year = ? ORDER BY id ASC LIMIT 1",
         (current_id, subj, year),
