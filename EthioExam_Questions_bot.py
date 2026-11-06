@@ -101,12 +101,12 @@ def load_all_exam_datasets():
     conn = sqlite3.connect(DB_NAME)
 
     files_to_import = [
-        # 2017 Datasets
+        # 2017 Datasets (Exam year stored as '2017_ጥር' and '2017_ሰኔ')
         ("CS_2017_Tir_100_Unique_Final.csv", "CS", "2017_ጥር"),
         ("CS_2017_Sane_100_Unique_Final.csv", "CS", "2017_ሰኔ"),
         ("IT_2017_Tir_100_Unique_Final.csv", "IT", "2017_ጥር"),
         ("IT_2017_Sane_100_Unique_Final.csv", "IT", "2017_ሰኔ"),
-        # 2018 Datasets
+        # 2018 Datasets (Exam year stored as '2018_ጥር' and '2018_ሰኔ')
         ("CS_2018_Tir_100_Questions_Distinct.csv", "CS", "2018_ጥር"),
         ("CS_2018_Sane_100_Questions_Distinct.csv", "CS", "2018_ሰኔ"),
         ("IT_2018_Tir_100_Questions_Distinct.csv", "IT", "2018_ጥር"),
@@ -275,17 +275,18 @@ async def it_2018_months(callback: types.CallbackQuery):
     await callback.message.edit_text("📡 **Information Technology - 2018**\n\nወር ይምረጡ:", reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 3. ፈተና መጀመሪያ (የተከፈተለትን ቼክ ማድረግ)
+# 3. ፈተና መጀመሪያ (የተከፈተለትን ቼክ ማድረግ እና ጥያቄ ማምጣት)
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
     user_id = callback.from_user.id
     parts = callback.data.split("_")
+    # callback format: start_exam_CS_2017_ጥር -> parts[0]=start, parts[1]=exam, parts[2]=CS, parts[3]=2017, parts[4]=ጥር
     subject_code = parts[2]  # CS ወይም IT
-    exam_year_val = parts[3]  # 2017 ወይም 2018
-    exam_period = parts[4]    # ጥር ወይም ሰኔ
+    year_val = parts[3]      # 2017 ወይም 2018
+    month_val = parts[4]     # ጥር ወይም ሰኔ
 
-    full_period = f"{exam_year_val}_{exam_period}"
+    full_exam_year = f"{year_val}_{month_val}" # እንደ '2017_ጥር'
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -298,18 +299,18 @@ async def start_specific_exam(callback: types.CallbackQuery):
     pay_status = user_data[1] if user_data else 'free'
     paid_depts = user_data[2] if user_data else ''
 
-    pay_key = f"{subject_code}_{full_period}"
+    pay_key = f"{subject_code}_{full_exam_year}"
     is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
     if not is_paid_for_this and free_used >= 3:
-        await send_payment_prompt(callback.message, f"{subject_code} ({full_period})", pay_key)
+        await send_payment_prompt(callback.message, f"{subject_code} ({year_val} {month_val})", pay_key)
         return
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
         "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE subject = ? AND exam_year = ? LIMIT 1",
-        (subject_code, full_period)
+        (subject_code, full_exam_year)
     )
     q = cursor.fetchone()
     conn.close()
@@ -329,13 +330,13 @@ async def start_specific_exam(callback: types.CallbackQuery):
 
         rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - free_used})" if not is_paid_for_this else " (VIP የተከፈተ 🌟)"
         await callback.message.answer(
-            f"📝 **{subject_code} ({full_period}) Exit Exam - Q1{rem_text}:**\n\n{q_text}",
+            f"📝 **{subject_code} ({year_val} {month_val}) Exit Exam - Q1{rem_text}:**\n\n{q_text}",
             reply_markup=builder.as_markup(), parse_mode="Markdown"
         )
     else:
         builder = InlineKeyboardBuilder()
         builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
-        await callback.message.answer(f"⚠️ በዳታቤዙ ውስጥ ለ **{subject_code} ({full_period})** የተመዘገቡ ጥያቄዎች አልተገኙም!",
+        await callback.message.answer(f"⚠️ በዳታቤዙ ውስጥ ለ **{subject_code} ({year_val} {month_val})** የተመዘገቡ ጥያቄዎች አልተገኙም!",
                                       reply_markup=builder.as_markup())
 
 
