@@ -33,7 +33,6 @@ dp = Dispatcher()
 
 DB_NAME = "brand_new_exam.db"
 
-# የባነር ፎቶ File ID (እዚህ ጋር የፎቶዎን file_id ወይም ሊንክ ያስገቡ)
 WELCOME_BANNER_PHOTO = "YOUR_PHOTO_FILE_ID_OR_URL_HERE"
 
 
@@ -101,12 +100,10 @@ def load_all_exam_datasets():
     conn = sqlite3.connect(DB_NAME)
 
     files_to_import = [
-        # 2017 Datasets (Exam year stored as '2017_ጥር' and '2017_ሰኔ')
         ("CS_2017_Tir_100_Unique_Final.csv", "CS", "2017_ጥር"),
         ("CS_2017_Sane_100_Unique_Final.csv", "CS", "2017_ሰኔ"),
         ("IT_2017_Tir_100_Unique_Final.csv", "IT", "2017_ጥር"),
         ("IT_2017_Sane_100_Unique_Final.csv", "IT", "2017_ሰኔ"),
-        # 2018 Datasets (Exam year stored as '2018_ጥር' and '2018_ሰኔ')
         ("CS_2018_Tir_100_Questions_Distinct.csv", "CS", "2018_ጥር"),
         ("CS_2018_Sane_100_Questions_Distinct.csv", "CS", "2018_ሰኔ"),
         ("IT_2018_Tir_100_Questions_Distinct.csv", "IT", "2018_ጥር"),
@@ -191,7 +188,7 @@ async def cmd_start(message: types.Message):
         await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 1. Computer Science ዓመታት መምረጫ ሜኑ (2017 እና 2018)
+# 1. Computer Science ዓመታት መምረጫ ሜኑ
 @dp.callback_query(F.data == "dept_cs_menu")
 async def cs_years_menu(callback: types.CallbackQuery):
     await callback.answer()
@@ -233,7 +230,7 @@ async def cs_2018_months(callback: types.CallbackQuery):
     await callback.message.edit_text("💻 **Computer Science - 2018**\n\nወር ይምረጡ:", reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 2. Information Technology ዓመታት መምረጫ ሜኑ (2017 እና 2018)
+# 2. Information Technology ዓመታት መምረጫ ሜኑ
 @dp.callback_query(F.data == "dept_it_menu")
 async def it_years_menu(callback: types.CallbackQuery):
     await callback.answer()
@@ -275,18 +272,17 @@ async def it_2018_months(callback: types.CallbackQuery):
     await callback.message.edit_text("📡 **Information Technology - 2018**\n\nወር ይምረጡ:", reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 3. ፈተና መጀመሪያ (የተከፈተለትን ቼክ ማድረግ እና ጥያቄ ማምጣት)
+# 3. ፈተና መጀመሪያ (የመጀመሪያውን ጥያቄ ማምጣት)
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
     user_id = callback.from_user.id
     parts = callback.data.split("_")
-    # callback format: start_exam_CS_2017_ጥር -> parts[0]=start, parts[1]=exam, parts[2]=CS, parts[3]=2017, parts[4]=ጥር
     subject_code = parts[2]  # CS ወይም IT
     year_val = parts[3]      # 2017 ወይም 2018
     month_val = parts[4]     # ጥር ወይም ሰኔ
 
-    full_exam_year = f"{year_val}_{month_val}" # እንደ '2017_ጥር'
+    full_exam_year = f"{year_val}_{month_val}"
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -309,7 +305,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE subject = ? AND exam_year = ? LIMIT 1",
+        "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE subject = ? AND exam_year = ? ORDER BY id ASC LIMIT 1",
         (subject_code, full_exam_year)
     )
     q = cursor.fetchone()
@@ -365,7 +361,7 @@ async def screenshot_info(callback: types.CallbackQuery):
         "📸 እባክዎ የክፍያ ማረጋገጫ (Screenshot) ምስል በቀጥታ በዚህ ቻት ውስጥ ፎቶውን ይላኩ። አድሚኑ ወዲያውኑ አረጋግጦ ይከፍትልዎታል!")
 
 
-# 5. ተማሪዎች የሚልኩትን የክፍያ ስክሪንሾት መቀበል (Multi-select ለአድሚን)
+# 5. ተማሪዎች የሚልኩትን የክፍያ ስክሪንሾት መቀበል
 @dp.message(F.photo)
 async def handle_payment_screenshot(message: types.Message):
     user_id = message.from_user.id
@@ -570,7 +566,7 @@ async def check_answer(callback: types.CallbackQuery):
     await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 7. ቀጣይ ጥያቄ
+# 7. ቀጣይ ጥያቄ (በተመሳሳይ subject እና exam_year ውስጥ ቀጣዩን id በትክክል መፈለግ)
 @dp.callback_query(F.data.startswith("next_"))
 async def next_question(callback: types.CallbackQuery):
     await callback.answer()
@@ -606,6 +602,7 @@ async def next_question(callback: types.CallbackQuery):
         await send_payment_prompt(callback.message, f"{subj} ({year})", pay_key)
         return
 
+    # በዚያው subject እና exam_year ውስጥ ከ current_id የሚቀጥለውን ጥያቄ መፈለግ
     cursor.execute(
         "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE id > ? AND subject = ? AND exam_year = ? ORDER BY id ASC LIMIT 1",
         (current_id, subj, year),
