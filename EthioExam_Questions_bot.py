@@ -2,7 +2,7 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 import sqlite3
 import os
 from flask import Flask
@@ -83,7 +83,16 @@ def init_db():
     conn.close()
 
 
-# /start ትዕዛዝ - ዋናው ማስተካከያ ሜኑ
+# ከታች በስተግራ የሚታየውን የ Menu ቁልፍ ማዋቀር
+def get_main_reply_keyboard():
+    builder = ReplyKeyboardBuilder()
+    builder.button(text="📋 Menu")
+    builder.adjust(1)
+    return builder.as_markup(resize_keyboard=True)
+
+
+# /start ትዕዛዝ እና የ "📋 Menu" ቴክስት መልእክት መቀበያ
+@dp.message(F.text == "📋 Menu")
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
@@ -107,21 +116,22 @@ async def cmd_start(message: types.Message):
         types.InlineKeyboardButton(text="🔖 Bookmarks", callback_data="my_bookmarks")
     )
     builder.row(
-        types.InlineKeyboardButton(text="🎓 Documents (PPT/PDF)", callback_data="tutorial_package")
+        types.InlineKeyboardButton(text="📚 Documents (PPT/PDF)", callback_data="tutorial_package")
     )
     builder.row(
-        types.InlineKeyboardButton(text="🎲 Random Quiz", callback_data="rand_start_1"),
-        types.InlineKeyboardButton(text="ℹ️ Help", callback_data="help_menu")
+        types.InlineKeyboardButton(text="🎲 Random Quiz", callback_data="rand_start_1_0"),
+        types.InlineKeyboardButton(text="❓ Help & Support", callback_data="help_menu")
     )
 
     welcome_text = (
         f"👋 **ሰላም {user_name}!**\n\n"
-        f"🎓 **ወደ WanK Exit Exam ዝግጅት ቦት እንኳን ደህና መጡ።**\n"
-        f"ለኮምፒውተር ሳይንስ እና ለአይቲ (IT) ዲፓርትመንቶች ጥያቄዎች እና ማብራሪያዎች እዚህ ያገኛሉ።\n\n"
+        f"🎓 **ወደ WankExamBot እንኳን ደህና መጡ።**\n"
+        f"ለኮምፒውተር ሳይንስ (CS), ለአይቲ (IT), Freshman and Remedial ጥያቄዎች እና ማብራሪያዎች እዚህ ያገኛሉ።\n\n"
         f"👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:"
     )
 
-    await message.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+    await message.answer(welcome_text, reply_markup=get_main_reply_keyboard())
+    await message.answer("👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:", reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
 # 1. Computer Science የዓመታት/ወራት ምርጫ ሜኑ
@@ -130,8 +140,8 @@ async def cs_years_menu(callback: types.CallbackQuery):
     await callback.answer()
     builder = InlineKeyboardBuilder()
     builder.row(
-        types.InlineKeyboardButton(text="📅 የጥር ወር ፈተና", callback_data="start_exam_CS_ጥር"),
-        types.InlineKeyboardButton(text="📅 የሰኔ ወር ፈተና", callback_data="start_exam_CS_ሰኔ")
+        types.InlineKeyboardButton(text="📅 የጥር ወር ፈተና", callback_data="start_exam_CS_ጥር_1_0"),
+        types.InlineKeyboardButton(text="📅 የሰኔ ወር ፈተና", callback_data="start_exam_CS_ሰኔ_1_0")
     )
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
@@ -148,8 +158,8 @@ async def it_years_menu(callback: types.CallbackQuery):
     await callback.answer()
     builder = InlineKeyboardBuilder()
     builder.row(
-        types.InlineKeyboardButton(text="📅 የጥር ወር ፈተና", callback_data="start_exam_IT_ጥር"),
-        types.InlineKeyboardButton(text="📅 የሰኔ ወር ፈተና", callback_data="start_exam_IT_ሰኔ")
+        types.InlineKeyboardButton(text="📅 የጥር ወር ፈተና", callback_data="start_exam_IT_ጥር_1_0"),
+        types.InlineKeyboardButton(text="📅 የሰኔ ወር ፈተና", callback_data="start_exam_IT_ሰኔ_1_0")
     )
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
@@ -168,6 +178,8 @@ async def start_specific_exam(callback: types.CallbackQuery):
     parts = callback.data.split("_")
     subject_code = parts[2]
     exam_period = parts[3]
+    q_num = int(parts[4]) if len(parts) > 4 else 1
+    current_score = int(parts[5]) if len(parts) > 5 else 0
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -199,20 +211,18 @@ async def start_specific_exam(callback: types.CallbackQuery):
         q_id, q_text, opt_a, opt_b, opt_c, opt_d = q
 
         builder = InlineKeyboardBuilder()
-        builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}", callback_data=f"ans_{q_id}_A"))
-        builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}", callback_data=f"ans_{q_id}_B"))
-        builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}", callback_data=f"ans_{q_id}_C"))
-        builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}", callback_data=f"ans_{q_id}_D"))
+        builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}", callback_data=f"ans_{subject_code}_{exam_period}_{q_id}_{q_num}_{current_score}_A"))
+        builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}", callback_data=f"ans_{subject_code}_{exam_period}_{q_id}_{q_num}_{current_score}_B"))
+        builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}", callback_data=f"ans_{subject_code}_{exam_period}_{q_id}_{q_num}_{current_score}_C"))
+        builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}", callback_data=f"ans_{subject_code}_{exam_period}_{q_id}_{q_num}_{current_score}_D"))
         builder.row(
             types.InlineKeyboardButton(text="🔖 Bookmark", callback_data=f"bm_{q_id}"),
             types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu")
         )
 
         rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - free_used})" if pay_status != 'paid' or paid_dept != pay_key else " (VIP የተከፈተ 🌟)"
-        await callback.message.answer(
-            f"📝 **{subject_code} ({exam_period}) Exit Exam - Q1{rem_text}:**\n\n{q_text}",
-            reply_markup=builder.as_markup(), parse_mode="Markdown"
-        )
+        header_text = f"📝 **{subject_code} ({exam_period}) Exit Exam — Q{q_num}{rem_text}**\nScore: {current_score}/{q_num - 1 if q_num > 1 else 0}\n\n"
+        await callback.message.answer(header_text + q_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
     else:
         builder = InlineKeyboardBuilder()
         builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
@@ -344,8 +354,12 @@ async def check_answer(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
     parts = callback.data.split("_")
-    q_id = parts[1]
-    chosen_opt = parts[2]
+    subject_code = parts[1]
+    exam_period = parts[2]
+    q_id = parts[3]
+    q_num = int(parts[4])
+    current_score = int(parts[5])
+    chosen_opt = parts[6]
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -353,12 +367,7 @@ async def check_answer(callback: types.CallbackQuery):
                    (user_id,))
     res_user = cursor.fetchone()
 
-    cursor.execute("SELECT subject, exam_year FROM questions WHERE id = ?", (q_id,))
-    q_info = cursor.fetchone()
-
-    pay_key = "CS_ጥር"
-    if q_info:
-        pay_key = f"{q_info[0]}_{q_info[1]}"
+    pay_key = f"{subject_code}_{exam_period}"
 
     if res_user:
         free_used, pay_status, paid_dept = res_user
@@ -376,6 +385,7 @@ async def check_answer(callback: types.CallbackQuery):
     if res:
         correct, explanation = res
         if chosen_opt == correct:
+            current_score += 1
             result_text = "✅ **ትክክል ነው! (Correct)**"
             cursor.execute(
                 "UPDATE user_progress SET total_attempted = total_attempted + 1, correct_count = correct_count + 1 WHERE user_id = ?",
@@ -390,7 +400,7 @@ async def check_answer(callback: types.CallbackQuery):
     conn.close()
 
     builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="➡️ Next Question (ቀጣይ)", callback_data=f"next_{q_id}"))
+    builder.row(types.InlineKeyboardButton(text="➡️ Next Question (ቀጣይ)", callback_data=f"next_{subject_code}_{exam_period}_{q_id}_{q_num}_{current_score}"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
     feedback = f"{result_text}\n\n💡 **ማብራሪያ (Explanation):**\n{explanation}"
@@ -402,22 +412,15 @@ async def check_answer(callback: types.CallbackQuery):
 async def next_question(callback: types.CallbackQuery):
     await callback.answer()
     user_id = callback.from_user.id
-    current_id = int(callback.data.split("_")[1])
+    parts = callback.data.split("_")
+    subj = parts[1]
+    year = parts[2]
+    current_id = int(parts[3])
+    q_num = int(parts[4]) + 1
+    current_score = int(parts[5])
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT subject, exam_year FROM questions WHERE id = ?", (current_id,))
-    q_info = cursor.fetchone()
-
-    if not q_info:
-        conn.close()
-        await callback.message.answer("⚠️ ጥያቄው አልተገኘም!", reply_markup=InlineKeyboardBuilder().row(
-            types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu")).as_markup())
-        return
-
-    subj, year = q_info
-    pay_key = f"{subj}_{year}"
-
     cursor.execute("SELECT free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
                    (user_id,))
     user_data = cursor.fetchone()
@@ -425,6 +428,8 @@ async def next_question(callback: types.CallbackQuery):
     free_used = user_data[0] if user_data else 0
     pay_status = user_data[1] if user_data else 'free'
     paid_dept = user_data[2] if user_data else ''
+
+    pay_key = f"{subj}_{year}"
 
     if (pay_status != 'paid' or paid_dept != pay_key) and free_used >= 3:
         conn.close()
@@ -442,25 +447,23 @@ async def next_question(callback: types.CallbackQuery):
         q_id, q_text, opt_a, opt_b, opt_c, opt_d = q
 
         builder = InlineKeyboardBuilder()
-        builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}", callback_data=f"ans_{q_id}_A"))
-        builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}", callback_data=f"ans_{q_id}_B"))
-        builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}", callback_data=f"ans_{q_id}_C"))
-        builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}", callback_data=f"ans_{q_id}_D"))
+        builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}", callback_data=f"ans_{subj}_{year}_{q_id}_{q_num}_{current_score}_A"))
+        builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}", callback_data=f"ans_{subj}_{year}_{q_id}_{q_num}_{current_score}_B"))
+        builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}", callback_data=f"ans_{subj}_{year}_{q_id}_{q_num}_{current_score}_C"))
+        builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}", callback_data=f"ans_{subj}_{year}_{q_id}_{q_num}_{current_score}_D"))
         builder.row(
             types.InlineKeyboardButton(text="🔖 Bookmark", callback_data=f"bm_{q_id}"),
             types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu")
         )
 
         rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - free_used})" if pay_status != 'paid' or paid_dept != pay_key else " (VIP የተከፈተ 🌟)"
-        await callback.message.answer(
-            f"📝 **{subj} ({year}) - Next Question{rem_text}:**\n\n{q_text}",
-            reply_markup=builder.as_markup(),
-            parse_mode="Markdown",
-        )
+        header_text = f"📝 **{subj} ({year}) - Q{q_num}{rem_text}**\nScore: {current_score}/{q_num - 1}\n\n"
+        await callback.message.answer(header_text + q_text, reply_markup=builder.as_markup(),
+                                      parse_mode="Markdown",)
     else:
         builder = InlineKeyboardBuilder()
         builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
-        await callback.message.answer("🎉 **እንኳን ደስ አለዎት!** በዚህ ምድብ ያሉትን ጥያቄዎች በሙሉ አጠናቀዋል።",
+        await callback.message.answer(f"🎉 **እንኳን ደስ አለዎት!** በዚህ ምድብ ያሉትን ጥያቄዎች በሙሉ አጠናቀዋል። አጠቃላይ ውጤትዎ: **{current_score}/{q_num - 1}**",
                                       reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
@@ -504,7 +507,7 @@ async def show_bookmarks(callback: types.CallbackQuery):
         for bm in bookmarks:
             q_id, subj, year, q_text = bm
             bm_text += f"📌 ID: {q_id} | [{subj} - {year}]\n{q_text[:50]}...\n\n"
-            builder.row(types.InlineKeyboardButton(text=f"🔍 ጥያቄ #{q_id} ተመልከት", callback_data=f"ans_{q_id}_A"))
+            builder.row(types.InlineKeyboardButton(text=f"🔍 ጥያቄ #{q_id} ተመልከት", callback_data=f"ans_{subj}_{year}_{q_id}_1_0_A"))
     else:
         bm_text = "🔖 እስካሁን ያቀመጡት ጥያቄ የለም።"
 
@@ -537,11 +540,13 @@ async def progress_handler(callback: types.CallbackQuery):
     await callback.message.edit_text(progress_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 13. Random Quiz (በምስሉ ላይ እንዳለው 10 ጥያቄዎችን በቅደም ተከተል የሚያሳይ ነጻ ሎጂክ)
+# 13. Random Quiz
 @dp.callback_query(F.data.startswith("rand_start_"))
 async def random_quiz_start(callback: types.CallbackQuery):
     await callback.answer()
-    q_num = int(callback.data.split("_")[2])
+    parts = callback.data.split("_")
+    q_num = int(parts[2])
+    current_score = int(parts[3]) if len(parts) > 3 else 0
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -553,13 +558,13 @@ async def random_quiz_start(callback: types.CallbackQuery):
     if q:
         q_id, subj, year, q_text, opt_a, opt_b, opt_c, opt_d = q
         builder = InlineKeyboardBuilder()
-        builder.row(types.InlineKeyboardButton(text=f"A. {opt_a}", callback_data=f"rand_ans_{q_num}_{q_id}_A"))
-        builder.row(types.InlineKeyboardButton(text=f"B. {opt_b}", callback_data=f"rand_ans_{q_num}_{q_id}_B"))
-        builder.row(types.InlineKeyboardButton(text=f"C. {opt_c}", callback_data=f"rand_ans_{q_num}_{q_id}_C"))
-        builder.row(types.InlineKeyboardButton(text=f"D. {opt_d}", callback_data=f"rand_ans_{q_num}_{q_id}_D"))
+        builder.row(types.InlineKeyboardButton(text=f"A. {opt_a}", callback_data=f"rand_ans_{q_num}_{q_id}_{current_score}_A"))
+        builder.row(types.InlineKeyboardButton(text=f"B. {opt_b}", callback_data=f"rand_ans_{q_num}_{q_id}_{current_score}_B"))
+        builder.row(types.InlineKeyboardButton(text=f"C. {opt_c}", callback_data=f"rand_ans_{q_num}_{q_id}_{current_score}_C"))
+        builder.row(types.InlineKeyboardButton(text=f"D. {opt_d}", callback_data=f"rand_ans_{q_num}_{q_id}_{current_score}_D"))
         builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
-        header_text = f"🎲 **Random Quiz — {q_num}/10**\nSource: {subj} ({year}) Q{q_id}  Score: 0/0\n\n"
+        header_text = f"🎲 **Random Quiz — {q_num}/10**\nSource: {subj} ({year}) Q{q_id}  Score: {current_score}/{q_num - 1 if q_num > 1 else 0}\n\n"
         await callback.message.answer(header_text + q_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
     else:
         await callback.message.answer("⚠️ በዳታቤዙ ውስጥ ጥያቄዎች አልተገኙም!")
@@ -571,7 +576,8 @@ async def random_quiz_answer(callback: types.CallbackQuery):
     parts = callback.data.split("_")
     q_num = int(parts[2])
     q_id = int(parts[3])
-    chosen_opt = parts[4]
+    current_score = int(parts[4])
+    chosen_opt = parts[5]
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -582,22 +588,23 @@ async def random_quiz_answer(callback: types.CallbackQuery):
     if res:
         correct, explanation, subj, year = res
         if chosen_opt == correct:
+            current_score += 1
             res_txt = "✅ **ትክክል ነው! (Correct)**"
         else:
             res_txt = f"❌ **ስህተት ነው። ትክክለኛው መልስ: {correct}**"
 
         builder = InlineKeyboardBuilder()
         if q_num < 10:
-            builder.row(types.InlineKeyboardButton(text="➡️ Next Question (ቀጣይ)", callback_data=f"rand_start_{q_num + 1}"))
+            builder.row(types.InlineKeyboardButton(text="➡️ Next Question (ቀጣይ)", callback_data=f"rand_start_{q_num + 1}_{current_score}"))
         else:
-            builder.row(types.InlineKeyboardButton(text="🎉 ቪዩ አጠቃላይ ውጤት", callback_data="back_menu"))
+            builder.row(types.InlineKeyboardButton(text=f"🎉 አጠቃላይ ውጤት: {current_score}/10", callback_data="back_menu"))
         builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
         feedback = f"{res_txt}\n\n💡 **ማብራሪያ (Explanation):**\n{explanation}"
         await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 14. Tutorial Package (ንኡስ ምድቦች የተሟሉበት)
+# 14. Tutorial Package
 @dp.callback_query(F.data == "tutorial_package")
 async def tutorial_package_handler(callback: types.CallbackQuery):
     await callback.answer()
@@ -615,7 +622,7 @@ async def tutorial_package_handler(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
     await callback.message.edit_text(
-        "🎓 **Tutorial Package - Categories**\n\nእባክዎ የሚፈልጉትን የትምህርት ዘርፍ ይምረጡ:",
+        "🎓 **Documents (PPT/PDF) - Categories**\n\nእባክዎ የሚፈልጉትን የትምህርት ዘርፍ ይምረጡ:",
         reply_markup=builder.as_markup(), parse_mode="Markdown"
     )
 
@@ -627,7 +634,7 @@ async def tut_cs_handler(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text(
-        "💻 **Computer Science Tutorial Package**\n\n📥 [Download CS PPT/PDF](https://t.me/NegashComputerTips/261)",
+        "💻 **Computer Science Documents**\n\n📥 [Download CS PPT/PDF](https://t.me/NegashComputerTips/261)",
         reply_markup=builder.as_markup(), parse_mode="Markdown"
     )
 
@@ -639,7 +646,7 @@ async def tut_it_handler(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text(
-        "📡 **Information Technology Tutorial Package**\n\n📥 [Download IT PPT/PDF](https://t.me/NegashComputerTips/263)",
+        "📡 **Information Technology Documents**\n\n📥 [Download IT PPT/PDF](https://t.me/NegashComputerTips/263)",
         reply_markup=builder.as_markup(), parse_mode="Markdown"
     )
 
@@ -651,7 +658,7 @@ async def tut_fresh_nat_handler(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text(
-        "📚 **Freshman (Natural Science) Tutorial Package**\n\n📥 [Download Natural Science Materials](https://t.me/NegashComputerTips/264)",
+        "📚 **Freshman (Natural Science) Documents**\n\n📥 [Download Natural Science Materials](https://t.me/NegashComputerTips/264)",
         reply_markup=builder.as_markup(), parse_mode="Markdown"
     )
 
@@ -663,7 +670,7 @@ async def tut_fresh_soc_handler(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text(
-        "📚 **Freshman (Social Science) Tutorial Package**\n\n📥 [Download Social Science Materials](https://t.me/NegashComputerTips/265)",
+        "📚 **Freshman (Social Science) Documents**\n\n📥 [Download Social Science Materials](https://t.me/NegashComputerTips/265)",
         reply_markup=builder.as_markup(), parse_mode="Markdown"
     )
 
@@ -675,7 +682,7 @@ async def tut_rem_nat_handler(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text(
-        "📖 **Remedial (Natural Science) Tutorial Package**\n\n📥 [Download Remedial Natural Materials](https://t.me/NegashComputerTips/266)",
+        "📖 **Remedial (Natural Science) Documents**\n\n📥 [Download Remedial Natural Materials](https://t.me/NegashComputerTips/266)",
         reply_markup=builder.as_markup(), parse_mode="Markdown"
     )
 
@@ -687,12 +694,12 @@ async def tut_rem_soc_handler(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🔙 Back to Categories", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text(
-        "📖 **Remedial (Social Science) Tutorial Package**\n\n📥 [Download Remedial Social Materials](https://t.me/NegashComputerTips/266)",
+        "📖 **Remedial (Social Science) Documents**\n\n📥 [Download Remedial Social Materials](https://t.me/NegashComputerTips/266)",
         reply_markup=builder.as_markup(), parse_mode="Markdown"
     )
 
 
-# 15. Help
+# 15. Help & Support
 @dp.callback_query(F.data == "help_menu")
 async def help_handler(callback: types.CallbackQuery):
     await callback.answer()
