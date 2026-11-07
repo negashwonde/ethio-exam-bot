@@ -130,7 +130,7 @@ def load_all_exam_datasets():
     print("🎉 ሁሉም የ 2017 እና 2018 የጥር እና ሰኔ ጥያቄዎች ተጭነዋል!")
 
 
-# /start ትዕዛዝ
+# /start ትዕዛዝ (ስፓም እና የሩሲያኛ ማስታወቂያ እንዳይመጣ በንጹህ ቴክስት ብቻ የተሰራ)
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
@@ -242,6 +242,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
     pay_key = f"{subject_code}_{full_exam_year}"
     is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
+    # ነጻው ገደብ (3) ካለቀ እና ክፍያ ካልፈጸመ
     if not is_paid_for_this and free_used >= 3 and offset_val >= 3:
         conn.close()
         await send_payment_prompt(callback.message, f"{subject_code} ({year_val} {month_val})", pay_key)
@@ -280,6 +281,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
             reply_markup=builder.as_markup(), parse_mode="Markdown"
         )
     else:
+        # ፈተናው ሲያልቅ አጠቃላይ ውጤቱን ከ 100 አሳይ
         percentage = int((current_score / offset_val) * 100) if offset_val > 0 else 0
         builder = InlineKeyboardBuilder()
         builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
@@ -602,7 +604,7 @@ async def progress_handler(callback: types.CallbackQuery):
     await callback.message.edit_text(progress_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 10. Random Quiz (10 ጥያቄዎች በትክክል የሚሰራ እና Score የሚያሳይ)
+# 10. Random Quiz (በትክክል 10 ጥያቄዎችን በቅደም ተከተል የሚያሳይ እና ውጤት የሚያሰላ)
 @dp.callback_query(F.data.startswith("rand_start_"))
 async def random_quiz_start(callback: types.CallbackQuery):
     await callback.answer()
