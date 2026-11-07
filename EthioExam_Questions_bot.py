@@ -95,11 +95,10 @@ def load_all_exam_datasets():
     conn.commit()
     conn.close()
 
-    print("📂 የ 2017 እና 2018 ዓ.ም የጥር እና ሰኔ ጥያቄዎችን መጫን ጀመረ...")
+    print("📂 የ 2017 እና 2018 ዓ.ም የጥር እና ሰኔ ጥያቄዎችን በንጹህ ኢንኮዲንግ መጫን ጀመረ...")
 
     conn = sqlite3.connect(DB_NAME)
 
-    # እዚህ ጋር ዓመቱ እና ወሩ በትክክል (ለምሳሌ '2017_ጥር') እንዲቀመጡ ተስተካክለዋል
     files_to_import = [
         ("CS_2017_Tir_100_Unique_Final.csv", "CS", "2017_ጥር"),
         ("CS_2017_Sane_100_Unique_Final.csv", "CS", "2017_ሰኔ"),
@@ -114,7 +113,12 @@ def load_all_exam_datasets():
     for file_name, subj, year in files_to_import:
         if os.path.exists(file_name):
             try:
-                df = pd.read_csv(file_name)
+                # ዩኒኮድ እና የቋንቋ ስህተት እንዳያመጣ encoding='utf-8' ወይም 'latin1' መጠቀም
+                try:
+                    df = pd.read_csv(file_name, encoding='utf-8')
+                except UnicodeDecodeError:
+                    df = pd.read_csv(file_name, encoding='latin1')
+
                 df['subject'] = subj
                 df['exam_year'] = year
                 df.to_sql("questions", conn, if_exists="append", index=False)
@@ -129,7 +133,7 @@ def load_all_exam_datasets():
     print("🎉 ሁሉም የ 2017 እና 2018 የጥር እና ሰኔ ጥያቄዎች ተጭነዋል!")
 
 
-# /start ትዕዛዝ (በኢንላይን ኪቦርድ ብቻ የሚሰራ)
+# /start ትዕዛዝ
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
@@ -154,7 +158,7 @@ async def cmd_start(message: types.Message):
     )
     builder.row(
         types.InlineKeyboardButton(text="📄 Documents (PP, PDF) >", callback_data="tutorial_package"),
-        types.InlineKeyboardButton(text="📝 Random Quiz >", callback_data="rand_start_1_0_0")
+        types.InlineKeyboardButton(text="📝 Random Quiz >", callback_data="rand_start_1_0")
     )
     builder.row(
         types.InlineKeyboardButton(text="🎧 Help & Support >", callback_data="help_menu"),
@@ -184,104 +188,44 @@ async def cmd_start(message: types.Message):
         )
 
 
-# 1. Computer Science ዓመታት መምረጫ ሜኑ
+# 1. Computer Science ወራትን በቀጥታ መምረጫ ሜኑ (እየተገጣጠመ እንዳይቸገር ተስተካክሏል)
 @dp.callback_query(F.data == "dept_cs_menu")
 async def cs_years_menu(callback: types.CallbackQuery):
     await callback.answer()
     builder = InlineKeyboardBuilder()
     builder.row(
-        types.InlineKeyboardButton(text="📅 2017 ዓ.ም (ጥር/ሰኔ)", callback_data="cs_year_2017"),
-        types.InlineKeyboardButton(text="📅 2018 ዓ.ም (ጥር/ሰኔ)", callback_data="cs_year_2018")
+        types.InlineKeyboardButton(text="📅 2017 ዓ.ም — ጥር", callback_data="start_exam_CS_2017_ጥር"),
+        types.InlineKeyboardButton(text="📅 2017 ዓ.ም — ሰኔ", callback_data="start_exam_CS_2017_ሰኔ")
+    )
+    builder.row(
+        types.InlineKeyboardButton(text="📅 2018 ዓ.ም — ጥር", callback_data="start_exam_CS_2018_ጥር"),
+        types.InlineKeyboardButton(text="📅 2018 ዓ.ም — ሰኔ", callback_data="start_exam_CS_2018_ሰኔ")
     )
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
-    text_msg = "💻 **Computer Science Exit Exam**\n\nእባክዎ መፈተን የሚፈልጉትን ዓመት ይምረጡ:"
+    text_msg = "💻 **Computer Science Exit Exam**\n\nእባክዎ መፈተን የሚፈልጉትን ዓመት እና ወር ይምረጡ:"
     if callback.message.photo:
         await callback.message.edit_caption(caption=text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
     else:
         await callback.message.edit_text(text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@dp.callback_query(F.data == "cs_year_2017")
-async def cs_2017_months(callback: types.CallbackQuery):
-    await callback.answer()
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        types.InlineKeyboardButton(text="📅 2017 የጥር ወር ፈተና", callback_data="start_exam_CS_2017_ጥር"),
-        types.InlineKeyboardButton(text="📅 2017 የሰኔ ወር ፈተና", callback_data="start_exam_CS_2017_ሰኔ")
-    )
-    builder.row(types.InlineKeyboardButton(text="🔙 Back", callback_data="dept_cs_menu"))
-
-    text_msg = "💻 **Computer Science - 2017**\n\nወር ይምረጡ:"
-    if callback.message.photo:
-        await callback.message.edit_caption(caption=text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
-    else:
-        await callback.message.edit_text(text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
-
-
-@dp.callback_query(F.data == "cs_year_2018")
-async def cs_2018_months(callback: types.CallbackQuery):
-    await callback.answer()
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        types.InlineKeyboardButton(text="📅 2018 የጥር ወር ፈተና", callback_data="start_exam_CS_2018_ጥር"),
-        types.InlineKeyboardButton(text="📅 2018 የሰኔ ወር ፈተና", callback_data="start_exam_CS_2018_ሰኔ")
-    )
-    builder.row(types.InlineKeyboardButton(text="🔙 Back", callback_data="dept_cs_menu"))
-
-    text_msg = "💻 **Computer Science - 2018**\n\nወር ይምረጡ:"
-    if callback.message.photo:
-        await callback.message.edit_caption(caption=text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
-    else:
-        await callback.message.edit_text(text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
-
-
-# 2. Information Technology ዓመታት መምረጫ ሜኑ
+# 2. Information Technology ወራትን በቀጥታ መምረጫ ሜኑ
 @dp.callback_query(F.data == "dept_it_menu")
 async def it_years_menu(callback: types.CallbackQuery):
     await callback.answer()
     builder = InlineKeyboardBuilder()
     builder.row(
-        types.InlineKeyboardButton(text="📅 2017 ዓ.ም (ጥር/ሰኔ)", callback_data="it_year_2017"),
-        types.InlineKeyboardButton(text="📅 2018 ዓ.ም (ጥር/ሰኔ)", callback_data="it_year_2018")
+        types.InlineKeyboardButton(text="📅 2017 ዓ.ም — ጥር", callback_data="start_exam_IT_2017_ጥር"),
+        types.InlineKeyboardButton(text="📅 2017 ዓ.ም — ሰኔ", callback_data="start_exam_IT_2017_ሰኔ")
+    )
+    builder.row(
+        types.InlineKeyboardButton(text="📅 2018 ዓ.ም — ጥር", callback_data="start_exam_IT_2018_ጥር"),
+        types.InlineKeyboardButton(text="📅 2018 ዓ.ም — ሰኔ", callback_data="start_exam_IT_2018_ሰኔ")
     )
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
-    text_msg = "📡 **Information Technology (IT) Exit Exam**\n\nእባክዎ መፈተን የሚፈልጉትን ዓመት ይምረጡ:"
-    if callback.message.photo:
-        await callback.message.edit_caption(caption=text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
-    else:
-        await callback.message.edit_text(text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
-
-
-@dp.callback_query(F.data == "it_year_2017")
-async def it_2017_months(callback: types.CallbackQuery):
-    await callback.answer()
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        types.InlineKeyboardButton(text="📅 2017 የጥር ወር ፈተና", callback_data="start_exam_IT_2017_ጥር"),
-        types.InlineKeyboardButton(text="📅 2017 የሰኔ ወር ፈተና", callback_data="start_exam_IT_2017_ሰኔ")
-    )
-    builder.row(types.InlineKeyboardButton(text="🔙 Back", callback_data="dept_it_menu"))
-
-    text_msg = "📡 **Information Technology - 2017**\n\nወር ይምረጡ:"
-    if callback.message.photo:
-        await callback.message.edit_caption(caption=text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
-    else:
-        await callback.message.edit_text(text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
-
-
-@dp.callback_query(F.data == "it_year_2018")
-async def it_2018_months(callback: types.CallbackQuery):
-    await callback.answer()
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        types.InlineKeyboardButton(text="📅 2018 የጥር ወር ፈተና", callback_data="start_exam_IT_2018_ጥር"),
-        types.InlineKeyboardButton(text="📅 2018 የሰኔ ወር ፈተና", callback_data="start_exam_IT_2018_ሰኔ")
-    )
-    builder.row(types.InlineKeyboardButton(text="🔙 Back", callback_data="dept_it_menu"))
-
-    text_msg = "📡 **Information Technology - 2018**\n\nወር ይምረጡ:"
+    text_msg = "📡 **Information Technology (IT) Exit Exam**\n\nእባክዎ መፈተን የሚፈልጉትን ዓመት እና ወር ይምረጡ:"
     if callback.message.photo:
         await callback.message.edit_caption(caption=text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
     else:
@@ -583,7 +527,7 @@ async def check_answer(callback: types.CallbackQuery):
     await callback.message.answer(feedback, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 7. ቀጣይ ጥያቄ (Next Question) - ያለ ማቋረጥ ቀጣዩን ጥያቄ ለማምጣት የተስተካከለ
+# 7. ቀጣይ ጥያቄ (Next Question)
 @dp.callback_query(F.data.startswith("next_"))
 async def next_question(callback: types.CallbackQuery):
     await callback.answer()
@@ -619,7 +563,6 @@ async def next_question(callback: types.CallbackQuery):
         await send_payment_prompt(callback.message, f"{subj} ({year})", pay_key)
         return
 
-    # በዚያው subject እና exam_year ውስጥ ከ current_id የሚቀጥለውን ጥያቄ መፈለግ
     cursor.execute(
         "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE id > ? AND subject = ? AND exam_year = ? ORDER BY id ASC LIMIT 1",
         (current_id, subj, year),
