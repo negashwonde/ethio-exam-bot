@@ -604,7 +604,7 @@ async def progress_handler(callback: types.CallbackQuery):
     await callback.message.edit_text(progress_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 10. Random Quiz (በትክክል 10 ጥያቄዎችን በቅደም ተከተል የሚያሳይ እና ውጤት የሚያሰላ)
+# 10. Random Quiz (10 ጥያቄዎች በነጻ እና ትክክለኛ ውጤት ማሳያ)
 @dp.callback_query(F.data.startswith("rand_start_"))
 async def random_quiz_start(callback: types.CallbackQuery):
     await callback.answer()
