@@ -6,16 +6,18 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 import sqlite3
 import os
 import pandas as pd
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, request, jsonify
 from threading import Thread
 
-# 1. ዌብ ሰርቨር (Flask) ማዋቀር - ለ Mini App እና Render 24/7 አሰራር
+# 1. ዌብ ሰርቨር (Flask) ማዋቀር - ለ Mini App API እና Render 24/7 አሰራር
 app = Flask("")
 
-# የ Telegram Mini App ፊት ገጽ (HTML & JavaScript)
+DB_NAME = "brand_new_exam.db"
+
+# የተሟላ የ Telegram Mini App (Frontend + Interactive Exam Engine)
 MINI_APP_HTML = """
 <!DOCTYPE html>
-<html lang="en">
+<html lang="am">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -37,6 +39,7 @@ MINI_APP_HTML = """
             border-radius: 12px;
             margin-top: 20px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            text-align: left;
         }
         .btn {
             background-color: #0284c7;
@@ -46,22 +49,61 @@ MINI_APP_HTML = """
             border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
-            margin-top: 15px;
+            margin-top: 10px;
             width: 100%;
+            transition: 0.2s;
         }
         .btn:hover { background-color: #0369a1; }
+        .opt-btn {
+            background-color: #334155;
+            color: white;
+            border: 1px solid #475569;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 8px;
+            width: 100%;
+            text-align: left;
+        }
+        .opt-btn:hover { background-color: #475569; }
+        .correct { background-color: #16a34a !important; }
+        .incorrect { background-color: #dc2626 !important; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-    <h1>🎓 Wank Exam Mini App</h1>
-    <p id="user-greeting">Welcome to your exam portal!</p>
+    <h1>🎓 Wank Exam Portal</h1>
+    <p id="user-greeting">ሰላም!</p>
 
-    <div class="card">
-        <h3>🚀 Select Exam Category</h3>
-        <p>Choose your department to start practicing questions seamlessly.</p>
-        <button class="btn" onclick="openCategory('Computer Science')">Computer Science (CS)</button>
-        <button class="btn" onclick="openCategory('Information Technology')">Information Technology (IT)</button>
-        <button class="btn" onclick="openCategory('Freshman')">Freshman Program</button>
+    <!-- Home / Dept Selection -->
+    <div id="home-view" class="card">
+        <h3>🚀 ዲፓርትመንት ይምረጡ</h3>
+        <button class="btn" onclick="selectDept('CS', '2017_ጥር')">💻 Computer Science (2017 ጥር)</button>
+        <button class="btn" onclick="selectDept('CS', '2018_ጥር')">💻 Computer Science (2018 ጥር)</button>
+        <button class="btn" onclick="selectDept('IT', '2017_ጥር')">📡 Information Technology (2017 ጥር)</button>
+        <button class="btn" onclick="selectDept('IT', '2018_ጥር')">📡 Information Technology (2018 ጥር)</button>
+    </div>
+
+    <!-- Exam View -->
+    <div id="exam-view" class="card hidden">
+        <h3 id="q-title">ጥያቄ</h3>
+        <p id="q-text" style="font-size: 16px; line-height: 1.5;"></p>
+
+        <button class="opt-btn" id="btn-a" onclick="submitAnswer('A')"></button>
+        <button class="opt-btn" id="btn-b" onclick="submitAnswer('B')"></button>
+        <button class="opt-btn" id="btn-c" onclick="submitAnswer('C')"></button>
+        <button class="opt-btn" id="btn-d" onclick="submitAnswer('D')"></button>
+
+        <p id="explanation" style="margin-top: 15px; font-size: 14px; color: #38bdf8;"></p>
+        <button id="next-btn" class="btn hidden" onclick="loadNextQuestion()">ቀጣይ ጥያቄ ➡️</button>
+    </div>
+
+    <!-- Result View -->
+    <div id="result-view" class="card hidden" style="text-align: center;">
+        <h2>🎉 እንኳን ደስ አለዎት!</h2>
+        <p id="final-score" style="font-size: 18px;"></p>
+        <button class="btn" onclick="location.reload()">ወደ ዋናው ማውጫ ተመለስ</button>
     </div>
 
     <script>
@@ -69,12 +111,95 @@ MINI_APP_HTML = """
         tg.expand();
 
         const user = tg.initDataUnsafe?.user;
+        let userId = user ? user.id : 12345;
         if (user) {
-            document.getElementById('user-greeting').innerText = `👋 Hello, ${user.first_name}!`;
+            document.getElementById('user-greeting').innerText = `👋 ሰላም, ${user.first_name}!`;
         }
 
-        function openCategory(dept) {
-            alert(`You selected ${dept}. Loading exam interface...`);
+        let currentSubject = '';
+        let currentYear = '';
+        let questionsList = [];
+        let currentIndex = 0;
+        let score = 0;
+
+        function selectDept(subj, year) {
+            currentSubject = subj;
+            currentYear = year;
+            fetch(`/api/questions?subject=${subj}&year=${year}&user_id=${userId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.locked) {
+                        alert("🔒 3ቱን ነጻ ጥያቄዎች ጨርሰዋል! ሙሉ ፈተናውን በቦቱ በኩል ክፍያ ፈጽመው ይክፈቱ።");
+                        return;
+                    }
+                    questionsList = data.questions;
+                    if (questionsList.length === 0) {
+                        alert("⚠️ በዚህ ምድብ ጥያቄዎች አልተገኙም!");
+                        return;
+                    }
+                    currentIndex = 0;
+                    score = 0;
+                    document.getElementById('home-view').classList.add('hidden');
+                    document.getElementById('exam-view').classList.remove('hidden');
+                    showQuestion();
+                });
+        }
+
+        function showQuestion() {
+            if (currentIndex >= questionsList.length) {
+                document.getElementById('exam-view').classList.add('hidden');
+                document.getElementById('result-view').classList.remove('hidden');
+                document.getElementById('final-score').innerText = `📊 ትክክለኛ መልሶች: ${score} ከ ${questionsList.length}`;
+                return;
+            }
+
+            let q = questionsList[currentIndex];
+            document.getElementById('q-title').innerText = `📝 ጥያቄ ቁጥር ${currentIndex + 1}`;
+            document.getElementById('q-text').innerText = q.question_text;
+
+            document.getElementById('btn-a').innerText = `A) ${q.option_a}`;
+            document.getElementById('btn-b').innerText = `B) ${q.option_b}`;
+            document.getElementById('btn-c').innerText = `C) ${q.option_c}`;
+            document.getElementById('btn-d').innerText = `D) ${q.option_d}`;
+
+            ['a', 'b', 'c', 'd'].forEach(opt => {
+                let btn = document.getElementById(`btn-${opt}`);
+                btn.disabled = false;
+                btn.className = "opt-btn";
+            });
+
+            document.getElementById('explanation').innerText = "";
+            document.getElementById('next-btn').classList.add('hidden');
+        }
+
+        function submitAnswer(selectedOpt) {
+            let q = questionsList[currentIndex];
+            ['a', 'b', 'c', 'd'].forEach(opt => {
+                document.getElementById(`btn-${opt}`).disabled = true;
+            });
+
+            fetch('/api/answer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, question_id: q.id, selected: selectedOpt })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.is_correct) {
+                    score++;
+                    document.getElementById(`btn-${selectedOpt.toLowerCase()}`).classList.add('correct');
+                } else {
+                    document.getElementById(`btn-${selectedOpt.toLowerCase()}`).classList.add('incorrect');
+                    document.getElementById(`btn-${data.correct_answer.toLowerCase()}`).classList.add('correct');
+                }
+                document.getElementById('explanation').innerText = `💡 ማብራሪያ: ${q.explanation || 'ለዚህ ጥያቄ ማብራሪያ አልተሰጠም።'}`;
+                document.getElementById('next-btn').classList.remove('hidden');
+            });
+        }
+
+        function loadNextQuestion() {
+            currentIndex++;
+            showQuestion();
         }
     </script>
 </body>
@@ -84,12 +209,78 @@ MINI_APP_HTML = """
 
 @app.route("/")
 def home():
-    return "🤖 WanK CS & IT Exit Exam Bot & Mini App is running live and active!"
+    return "🤖 WanK CS & IT Exit Exam Bot & Mini App API is running live!"
 
 
 @app.route("/webapp")
 def webapp():
     return render_template_string(MINI_APP_HTML)
+
+
+# የ Mini App API ለጥያቄዎች ማቀበያ
+@app.route("/api/questions")
+def api_questions():
+    subj = request.args.get("subject", "CS")
+    year = request.args.get("year", "2017_ጥር")
+    user_id = int(request.args.get("user_id", 0))
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
+                   (user_id,))
+    user_data = cursor.fetchone()
+
+    free_used = user_data[0] if user_data else 0
+    pay_status = user_data[1] if user_data else 'free'
+    paid_depts = user_data[2] if user_data else ''
+    pay_key = f"{subj}_{year}"
+    is_paid = pay_status == 'paid' and pay_key in paid_depts.split(",")
+
+    # ነጻ 3 ጥያቄዎች ካለቁ እና ክፍያ ካልፈጸመ
+    if not is_paid and free_used >= 3:
+        conn.close()
+        return jsonify({"locked": True, "questions": []})
+
+    cursor.execute(
+        "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE subject = ? AND exam_year = ?",
+        (subj, year))
+    rows = cursor.fetchall()
+    conn.close()
+
+    questions = []
+    for r in rows:
+        questions.append({
+            "id": r[0], "question_text": r[1], "option_a": r[2], "option_b": r[3],
+            "option_c": r[4], "option_d": r[5], "correct_answer": r[6], "explanation": r[7]
+        })
+    return jsonify({"locked": False, "questions": questions})
+
+
+# የ Mini App API ለምልስ ማረጋገጫ
+@app.route("/api/answer", methods=["POST"])
+def api_answer():
+    data = request.json
+    user_id = data.get("user_id")
+    q_id = data.get("question_id")
+    selected = data.get("selected")
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT correct_answer FROM questions WHERE id = ?", (q_id,))
+    res = cursor.fetchone()
+    correct_ans = res[0] if res else "A"
+
+    is_correct = (selected == correct_ans)
+
+    # ነጻ ጥያቄዎች ብዛት ማዘመን
+    cursor.execute("SELECT free_questions_used FROM users WHERE user_id = ?", (user_id,))
+    u_res = cursor.fetchone()
+    if u_res and u_res[0] < 3:
+        cursor.execute("UPDATE users SET free_questions_used = free_questions_used + 1 WHERE user_id = ?", (user_id,))
+        conn.commit()
+
+    conn.close()
+    return jsonify({"is_correct": is_correct, "correct_answer": correct_ans})
 
 
 def run_flask():
@@ -104,8 +295,6 @@ ADMIN_ID = 680798556  # የእርስዎ የአድሚን ቴሌግራም ID
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
-
-DB_NAME = "brand_new_exam.db"
 
 
 # 3. ዳታቤዙን ማቀናጀት እና የ 2017 እና 2018 ፋይሎችን በራስ-ሰር መጫን
@@ -223,7 +412,7 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
 
     builder = InlineKeyboardBuilder()
 
-    # --- Telegram Mini App Button (Render ሊንክዎ ተጨምሯል) ---
+    # --- Telegram Mini App Button (Render ሊንክዎ) ---
     builder.row(
         types.InlineKeyboardButton(
             text="🚀 Open Exam Mini App" if user_lang == 'en' else "🚀 ፈተናውን በ ሚኒ አፕ ክፈት",
@@ -292,13 +481,13 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
         await message_or_callback.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# /start ትዕዛዝ[cite: 8]
+# /start ትዕዛዝ
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await show_main_menu(message, message.from_user.id, message.from_user.first_name, edit=False)
 
 
-# ቋንቋ መቀየሪያ ሎጂክ[cite: 8]
+# ቋንቋ መቀየሪያ ሎጂክ
 @dp.callback_query(F.data.startswith("set_lang_"))
 async def set_language(callback: types.CallbackQuery):
     user_id = callback.from_user.id
@@ -432,7 +621,7 @@ async def remedial_menu(callback: types.CallbackQuery):
                                      reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 4. ፈተና መጀመሪያ[cite: 8]
+# 4. ፈተና መጀመሪያ (በቦት ቻት በኩል)[cite: 8]
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
@@ -468,7 +657,6 @@ async def start_specific_exam(callback: types.CallbackQuery):
     pay_key = f"{subject_code}_{full_exam_year}"
     is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
-    # ክፍያ ካልፈጸመ እና 3ቱ ነጻ ጥያቄዎች ካለቁ (ወይም ወደ ኋላ ተመልሶ ለመጠቀም ከሞከረ) እንደገና እንዳይጠቀም መቆለፊያ
     if not is_paid_for_this and (free_used >= 3 or offset_val >= 3):
         conn.close()
         await send_payment_prompt(callback.message, f"{subject_code} ({year_val} {month_val})", pay_key, user_lang)
@@ -537,7 +725,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
         await callback.message.answer(summary_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 5. የክፍያ ጥያቄ ማሳያ (በተመረጠው ቋንቋ)[cite: 8]
+# 5. የክፍያ ጥያቄ ማሳያ[cite: 8]
 async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: str, lang: str):
     if lang == 'am':
         pay_text = (
@@ -954,7 +1142,7 @@ async def main():
     flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
-    print("🌐 Flask Web Server & Mini App started successfully on port 8080")
+    print("🌐 Flask Web Server & Mini App API started successfully on port 8080")
     print("🚀 WanK Exam Bot is running live!")
     await dp.start_polling(bot)
 
