@@ -387,7 +387,8 @@ async def start_specific_exam(callback: types.CallbackQuery):
     pay_key = f"{subject_code}_{full_exam_year}"
     is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
-    if not is_paid_for_this and free_used >= 3 and offset_val >= 3:
+    # 3ቱ ነጻ ጥያቄዎች ካለቁ እና ክፍያ ካልፈጸመ እንደገና ወደ ኋላ ተመልሶ እንዳይጠቀም መቆለፊያ
+    if not is_paid_for_this and (free_used >= 3 or offset_val >= 3):
         conn.close()
         await send_payment_prompt(callback.message, f"{subject_code} ({year_val} {month_val})", pay_key, user_lang)
         return
