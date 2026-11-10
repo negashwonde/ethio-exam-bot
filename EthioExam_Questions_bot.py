@@ -14,46 +14,49 @@ app = Flask("")
 
 DB_NAME = "brand_new_exam.db"
 
-# የተሟላ የ Telegram Mini App (Frontend + Interactive Exam Engine)
+# የተሟላ የ Telegram Mini App (Frontend ከቦቱ ሜኑዎች እና ከላኩልኝ ፎቶ ጋር ተመሳሳይ ዲዛይን ያለው)
 MINI_APP_HTML = """
 <!DOCTYPE html>
 <html lang="am">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wank Exam Mini App</title>
+    <title>Wank Exam Bot Portal</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #0f172a;
+            background: linear-gradient(135deg, #0a192f 0%, #172a45 100%);
             color: #ffffff;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             text-align: center;
         }
-        h1 { color: #38bdf8; }
+        h1 { color: #38bdf8; font-size: 22px; margin-bottom: 5px; }
         .card {
-            background-color: #1e293b;
-            padding: 20px;
+            background: rgba(30, 41, 59, 0.85);
+            padding: 15px;
             border-radius: 12px;
-            margin-top: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            margin-top: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            border: 1px solid rgba(56, 189, 248, 0.2);
             text-align: left;
         }
         .btn {
-            background-color: #0284c7;
+            background: linear-gradient(to right, #1d4ed8, #0284c7);
             color: white;
             border: none;
-            padding: 12px 20px;
+            padding: 12px 15px;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 16px;
-            margin-top: 10px;
+            font-size: 15px;
+            margin-top: 8px;
             width: 100%;
-            transition: 0.2s;
+            text-align: left;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
-        .btn:hover { background-color: #0369a1; }
+        .btn:hover { opacity: 0.9; }
         .opt-btn {
             background-color: #334155;
             color: white;
@@ -70,25 +73,32 @@ MINI_APP_HTML = """
         .correct { background-color: #16a34a !important; }
         .incorrect { background-color: #dc2626 !important; }
         .hidden { display: none; }
+        .info-box { font-size: 14px; color: #93c5fd; margin-bottom: 10px; line-height: 1.4; }
     </style>
 </head>
 <body>
     <h1>🎓 Wank Exam Portal</h1>
-    <p id="user-greeting">ሰላም!</p>
+    <p id="user-greeting" style="color: #cbd5e1; font-size: 14px;">ሰላም!</p>
 
-    <!-- Home / Dept Selection -->
-    <div id="home-view" class="card">
-        <h3>🚀 ዲፓርትመንት ይምረጡ</h3>
-        <button class="btn" onclick="selectDept('CS', '2017_ጥር')">💻 Computer Science (2017 ጥር)</button>
-        <button class="btn" onclick="selectDept('CS', '2018_ጥር')">💻 Computer Science (2018 ጥር)</button>
-        <button class="btn" onclick="selectDept('IT', '2017_ጥር')">📡 Information Technology (2017 ጥር)</button>
-        <button class="btn" onclick="selectDept('IT', '2018_ጥር')">📡 Information Technology (2018 ጥር)</button>
+    <!-- Main Menu View (ከፎቶው ጋር ተመሳሳይ የሆኑ አማራጮች) -->
+    <div id="menu-view" class="card">
+        <div class="info-box">👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:</div>
+        <button class="btn" onclick="openCategory('CS', '2017_ጥር')">💻 ኮምፒውተር ሳይንስ (CS - 2017 ጥር)</button>
+        <button class="btn" onclick="openCategory('CS', '2018_ጥር')">💻 ኮምፒውተር ሳይንስ (CS - 2018 ጥር)</button>
+        <button class="btn" onclick="openCategory('IT', '2017_ጥር')">📚 ኢንፎርሜሽን ቴክኖሎጂ (IT - 2017 ጥር)</button>
+        <button class="btn" onclick="openCategory('IT', '2018_ጥር')">📚 ኢንፎርሜሽን ቴክኖሎጂ (IT - 2018 ጥር)</button>
+        <button class="btn" onclick="alert('📚 Freshman program exams and materials will be updated soon!')">📚 ፍሬሽማን (Freshman)</button>
+        <button class="btn" onclick="alert('📖 Remedial program exams and materials will be updated soon!')">📖 ሬሚዲያል (Remedial)</button>
+        <button class="btn" onclick="alert('📊 የርስዎን ውጤት ለማየት ዋናውን የቴሌግራም ቦት ይጠቀሙ።')">📊 የእኔ ውጤት (My Progress)</button>
+        <button class="btn" onclick="alert('📄 የሰነዶች ማቴሪያሎች በቦቱ ውስጥ በሚገኘው ሊንክ ማውረድ ይችላሉ።')">📄 ሰነዶች (ማቴሪያሎች)</button>
+        <button class="btn" onclick="alert('ℹ️ WankExamBot ለሁሉም የዩኒቨርሲቲ ተማሪዎች የተዘጋጀ የዝግጅት ረዳት ነው።')">ℹ️ ስለ ቦቱ (About Bot)</button>
+        <button class="btn" onclick="alert('🎧 እርዳታ ለማግኘት በስልክ ቁጥር 0919245693 ወይም @neguRoha ያግኙን።')">🎧 እርዳታ እና ድጋፍ (Support)</button>
     </div>
 
     <!-- Exam View -->
     <div id="exam-view" class="card hidden">
-        <h3 id="q-title">ጥያቄ</h3>
-        <p id="q-text" style="font-size: 16px; line-height: 1.5;"></p>
+        <h3 id="q-title" style="color: #38bdf8;">ጥያቄ</h3>
+        <p id="q-text" style="font-size: 15px; line-height: 1.5;"></p>
 
         <button class="opt-btn" id="btn-a" onclick="submitAnswer('A')"></button>
         <button class="opt-btn" id="btn-b" onclick="submitAnswer('B')"></button>
@@ -96,14 +106,15 @@ MINI_APP_HTML = """
         <button class="opt-btn" id="btn-d" onclick="submitAnswer('D')"></button>
 
         <p id="explanation" style="margin-top: 15px; font-size: 14px; color: #38bdf8;"></p>
-        <button id="next-btn" class="btn hidden" onclick="loadNextQuestion()">ቀጣይ ጥያቄ ➡️</button>
+        <button id="next-btn" class="btn hidden" onclick="loadNextQuestion()" style="text-align: center;">ቀጣይ ጥያቄ ➡️</button>
+        <button class="btn" onclick="backToMenu()" style="background: #475569; text-align: center; margin-top: 10px;">🏠 ዋና ማውጫ</button>
     </div>
 
     <!-- Result View -->
     <div id="result-view" class="card hidden" style="text-align: center;">
         <h2>🎉 እንኳን ደስ አለዎት!</h2>
-        <p id="final-score" style="font-size: 18px;"></p>
-        <button class="btn" onclick="location.reload()">ወደ ዋናው ማውጫ ተመለስ</button>
+        <p id="final-score" style="font-size: 18px; margin: 15px 0;"></p>
+        <button class="btn" onclick="backToMenu()" style="text-align: center;">🏠 ዋና ማውጫ ተመለስ</button>
     </div>
 
     <script>
@@ -122,14 +133,14 @@ MINI_APP_HTML = """
         let currentIndex = 0;
         let score = 0;
 
-        function selectDept(subj, year) {
+        function openCategory(subj, year) {
             currentSubject = subj;
             currentYear = year;
             fetch(`/api/questions?subject=${subj}&year=${year}&user_id=${userId}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.locked) {
-                        alert("🔒 3ቱን ነጻ ጥያቄዎች ጨርሰዋል! ሙሉ ፈተናውን በቦቱ በኩል ክፍያ ፈጽመው ይክፈቱ።");
+                        alert("🔒 3ቱን ነጻ ጥያቄዎች ጨርሰዋል! ሙሉ ፈተናውን ለመክፈት እባክዎ በቦቱ በኩል ክፍያ ፈጽመው ስክሪንሾት ይላኩ።");
                         return;
                     }
                     questionsList = data.questions;
@@ -139,7 +150,7 @@ MINI_APP_HTML = """
                     }
                     currentIndex = 0;
                     score = 0;
-                    document.getElementById('home-view').classList.add('hidden');
+                    document.getElementById('menu-view').classList.add('hidden');
                     document.getElementById('exam-view').classList.remove('hidden');
                     showQuestion();
                 });
@@ -201,6 +212,12 @@ MINI_APP_HTML = """
             currentIndex++;
             showQuestion();
         }
+
+        function backToMenu() {
+            document.getElementById('exam-view').classList.add('hidden');
+            document.getElementById('result-view').classList.add('hidden');
+            document.getElementById('menu-view').classList.remove('hidden');
+        }
     </script>
 </body>
 </html>
@@ -236,7 +253,7 @@ def api_questions():
     pay_key = f"{subj}_{year}"
     is_paid = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
-    # ነጻ 3 ጥያቄዎች ካለቁ እና ክፍያ ካልፈጸመ
+    # ነጻ 3 ጥያቄዎች ካለቁ እና አድሚኑ ካልፈቀደ (ክፍያ ካልጸደቀ)
     if not is_paid and free_used >= 3:
         conn.close()
         return jsonify({"locked": True, "questions": []})
@@ -412,7 +429,7 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
 
     builder = InlineKeyboardBuilder()
 
-    # --- Telegram Mini App Button (Render ሊንክዎ) ---
+    # --- Telegram Mini App Button ---
     builder.row(
         types.InlineKeyboardButton(
             text="🚀 Open Exam Mini App" if user_lang == 'en' else "🚀 ፈተናውን በ ሚኒ አፕ ክፈት",
@@ -481,13 +498,13 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
         await message_or_callback.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# /start ትዕዛዝ
+# /start ትዕዛዝ[cite: 8]
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await show_main_menu(message, message.from_user.id, message.from_user.first_name, edit=False)
 
 
-# ቋንቋ መቀየሪያ ሎጂክ
+# ቋንቋ መቀየሪያ ሎጂክ[cite: 8]
 @dp.callback_query(F.data.startswith("set_lang_"))
 async def set_language(callback: types.CallbackQuery):
     user_id = callback.from_user.id
