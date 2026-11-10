@@ -132,7 +132,7 @@ def load_all_exam_datasets():
     print("🎉 ሁሉም የ 2017 እና 2018 የጥር እና ሰኔ ጥያቄዎች ተጭነዋል!")
 
 
-# /start ትዕዛዝ (ከ Amh / Eng አማራጭ ጋር)
+# /start ትዕዛዝ (ከሰላምታ እና ከተማሪው ስም ጋር)
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
@@ -155,31 +155,41 @@ async def cmd_start(message: types.Message):
 
     builder = InlineKeyboardBuilder()
     builder.row(
-        types.InlineKeyboardButton(text="💻 Computer Science >", callback_data="dept_cs_menu"),
-        types.InlineKeyboardButton(text="📚 Information Technology >", callback_data="dept_it_menu")
+        types.InlineKeyboardButton(text="💻 Computer Science >" if user_lang == 'en' else "💻 ኮምፒውተር ሳይንስ >",
+                                   callback_data="dept_cs_menu"),
+        types.InlineKeyboardButton(text="📚 Information Technology >" if user_lang == 'en' else "📚 ኢንፎርሜሽን ቴክኖሎጂ >",
+                                   callback_data="dept_it_menu")
     )
     builder.row(
-        types.InlineKeyboardButton(text="📚 Freshman >", callback_data="dept_freshman_menu"),
-        types.InlineKeyboardButton(text="📖 Remedial >", callback_data="dept_remedial_menu")
+        types.InlineKeyboardButton(text="📚 Freshman >" if user_lang == 'en' else "📚 ፍሬሽማን >",
+                                   callback_data="dept_freshman_menu"),
+        types.InlineKeyboardButton(text="📖 Remedial >" if user_lang == 'en' else "📖 ሬሚዲያል >",
+                                   callback_data="dept_remedial_menu")
     )
     builder.row(
-        types.InlineKeyboardButton(text="📊 My Progress >", callback_data="my_progress"),
-        types.InlineKeyboardButton(text="🔖 Bookmarks >", callback_data="my_bookmarks")
+        types.InlineKeyboardButton(text="📊 My Progress >" if user_lang == 'en' else "📊 የእኔ ውጤት >",
+                                   callback_data="my_progress"),
+        types.InlineKeyboardButton(text="🔖 Bookmarks >" if user_lang == 'en' else "🔖 ያስቀመጧቸው >",
+                                   callback_data="my_bookmarks")
     )
     builder.row(
-        types.InlineKeyboardButton(text="📄 Documents (PP, PDF) >", callback_data="tutorial_package")
+        types.InlineKeyboardButton(text="📄 Documents (PP, PDF) >" if user_lang == 'en' else "📄 ሰነዶች (ማቴሪያሎች) >",
+                                   callback_data="tutorial_package")
     )
     builder.row(
-        types.InlineKeyboardButton(text="⚙️ ዲፓርትመንት ቀይር (Change Dept)", callback_data="change_dept_menu")
+        types.InlineKeyboardButton(text="⚙️ Change Department" if user_lang == 'en' else "⚙️ ዲፓርትመንት ቀይር",
+                                   callback_data="change_dept_menu")
     )
     builder.row(
-        types.InlineKeyboardButton(text="ℹ️ About Bot >", callback_data="about_bot"),
-        types.InlineKeyboardButton(text="🎧 Help & Support >", callback_data="help_menu")
+        types.InlineKeyboardButton(text="ℹ️ About Bot >" if user_lang == 'en' else "ℹ️ ስለ ቦቱ >",
+                                   callback_data="about_bot"),
+        types.InlineKeyboardButton(text="🎧 Help & Support >" if user_lang == 'en' else "🎧 እርዳታ እና ድጋፍ >",
+                                   callback_data="help_menu")
     )
-    # የቋንቋ መቀየሪያ በተን (Amh / Eng)[cite: 8]
-    lang_btn_text = "🇪🇹 አማርኛ (Amh)" if user_lang == 'am' else "🇬🇧 English (Eng)"
+    # ሁለቱ የተናጠል የቋንቋ በተኖች (Amh እና Eng)[cite: 8]
     builder.row(
-        types.InlineKeyboardButton(text=lang_btn_text, callback_data=f"toggle_lang_{user_lang}")
+        types.InlineKeyboardButton(text="🇪🇹 አማርኛ", callback_data="set_lang_am"),
+        types.InlineKeyboardButton(text="🇬🇧 English", callback_data="set_lang_en")
     )
 
     if user_lang == 'am':
@@ -206,12 +216,11 @@ async def cmd_start(message: types.Message):
     )
 
 
-# ቋንቋ መቀየሪያ ሎጂክ (Toggle Language)
-@dp.callback_query(F.data.startswith("toggle_lang_"))
-async def toggle_language(callback: types.CallbackQuery):
+# ቋንቋ መቀየሪያ ሎጂክ (Amh ወይም Eng ሲነካ)[cite: 8]
+@dp.callback_query(F.data.startswith("set_lang_"))
+async def set_language(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    current_lang = callback.data.split("_")[2]
-    new_lang = 'en' if current_lang == 'am' else 'am'
+    new_lang = callback.data.split("_")[2]
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -219,7 +228,7 @@ async def toggle_language(callback: types.CallbackQuery):
     conn.commit()
     conn.close()
 
-    await callback.answer(f"Language changed to {'English' if new_lang == 'en' else 'አማርኛ'}!")
+    await callback.answer(f"Language changed to {'አማርኛ' if new_lang == 'am' else 'English'}!")
     await back_to_menu(callback)
 
 
@@ -237,7 +246,7 @@ async def change_dept_menu(callback: types.CallbackQuery):
         types.InlineKeyboardButton(text="📖 Remedial", callback_data="set_dept_Remedial")
     )
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
-    await callback.message.edit_text("🎯 **እባክዎ ትክክለኛ ዲፓርትመንትዎን ይምረጡ / Select your department:**",
+    await callback.message.edit_text("🎯 **እባክዎ ዲፓርትመንትዎን ይምረጡ / Select your department:**",
                                      reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
@@ -322,7 +331,7 @@ async def it_years_menu(callback: types.CallbackQuery):
     await callback.message.edit_text(text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 3. Freshman & Remedial Menu Handlers (Placeholder for future or materials)
+# 3. Freshman & Remedial Menu Handlers
 @dp.callback_query(F.data == "dept_freshman_menu")
 async def freshman_menu(callback: types.CallbackQuery):
     await callback.answer()
@@ -341,7 +350,7 @@ async def remedial_menu(callback: types.CallbackQuery):
                                      reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 4. ፈተና መጀመሪያ (Questions in English only)
+# 4. ፈተና መጀመሪያ (Questions in English only)[cite: 8]
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
@@ -409,7 +418,6 @@ async def start_specific_exam(callback: types.CallbackQuery):
         rem_text = f" (Free Qs left: {3 - free_used})" if not is_paid_for_this else " (VIP Unlocked 🌟)"
         score_display = f" | Score: {current_score}/{offset_val}" if offset_val > 0 else ""
 
-        # Questions strictly in English as requested
         await callback.message.answer(
             f"📝 **{subject_code} ({year_val} {month_val}) Exit Exam — Q{q_num_display}{score_display}{rem_text}:**\n\n{q_text}",
             reply_markup=builder.as_markup(), parse_mode="Markdown"
