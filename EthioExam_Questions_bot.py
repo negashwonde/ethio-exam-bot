@@ -6,16 +6,91 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 import sqlite3
 import os
 import pandas as pd
-from flask import Flask
+from flask import Flask, render_template_string
 from threading import Thread
 
-# 1. ዌብ ሰርቨር (Flask) ማዋቀር - Render 24/7 እንዲሠራ
+# 1. ዌብ ሰርቨር (Flask) ማዋቀር - ለ Mini App እና 24/7 Render አሰራር
 app = Flask("")
+
+# የ Telegram Mini App ፊት ገጽ (HTML & JavaScript)
+MINI_APP_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wank Exam Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0f172a;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        h1 { color: #38bdf8; }
+        .card {
+            background-color: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .btn {
+            background-color: #0284c7;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px;
+            width: 100%;
+        }
+        .btn:hover { background-color: #0369a1; }
+    </style>
+</head>
+<body>
+    <h1>🎓 Wank Exam Mini App</h1>
+    <p id="user-greeting">Welcome to your exam portal!</p>
+
+    <div class="card">
+        <h3>🚀 Select Exam Category</h3>
+        <p>Choose your department to start practicing questions seamlessly.</p>
+        <button class="btn" onclick="openCategory('Computer Science')">Computer Science (CS)</button>
+        <button class="btn" onclick="openCategory('Information Technology')">Information Technology (IT)</button>
+        <button class="btn" onclick="openCategory('Freshman')">Freshman Program</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        const user = tg.initDataUnsafe?.user;
+        if (user) {
+            document.getElementById('user-greeting').innerText = `👋 Hello, ${user.first_name}!`;
+        }
+
+        function openCategory(dept) {
+            alert(`You selected ${dept}. Loading exam interface...`);
+            // እዚህ ጋር ወደ ሚፈልጉት ገጽ ወይም API ማዘዋወር ይቻላል
+        }
+    </script>
+</body>
+</html>
+"""
 
 
 @app.route("/")
 def home():
-    return "🤖 WanK CS & IT Exit Exam Bot is running live and active!"
+    return "🤖 WanK CS & IT Exit Exam Bot & Mini App is running live and active!"
+
+
+@app.route("/webapp")
+def webapp():
+    return render_template_string(MINI_APP_HTML)
 
 
 def run_flask():
@@ -84,7 +159,6 @@ def init_db():
 
     conn.commit()
     conn.close()
-
     load_all_exam_datasets()
 
 
@@ -98,7 +172,6 @@ def load_all_exam_datasets():
     print("📂 የ 2017 እና 2018 ዓ.ም የጥር እና ሰኔ ጥያቄዎችን በንጹህ ኢንኮዲንግ መጫን ጀመረ...")
 
     conn = sqlite3.connect(DB_NAME)
-
     files_to_import = [
         ("CS_2017_Tir_100_Unique_Final.csv", "CS", "2017_ጥር"),
         ("CS_2017_Sane_100_Unique_Final.csv", "CS", "2017_ሰኔ"),
@@ -132,7 +205,7 @@ def load_all_exam_datasets():
     print("🎉 ሁሉም የ 2017 እና 2018 የጥር እና ሰኔ ጥያቄዎች ተጭነዋል!")
 
 
-# ዋናውን ሜኑ የሚያሳይ ሄፐር ፈንክሽን
+# ዋናውን ሜኑ የሚያሳይ ሄፐር ፈንክشن (የ Mini App በተንን የያዘ)
 async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -150,6 +223,16 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
     conn.close()
 
     builder = InlineKeyboardBuilder()
+
+    # --- Telegram Mini App Button (እዚህ ጋር የ Render ሊንክዎን ያስገቡ) ---
+    # ማስታወሻ: ቦቱ Render ላይ ሲሰራ ሊንኩ https://your-app-name.onrender.com/webapp ይሆናል
+    builder.row(
+        types.InlineKeyboardButton(
+            text="🚀 Open Exam Mini App" if user_lang == 'en' else "🚀 ፈተናውን በ ሚኒ አፕ ክፈት",
+            web_app=types.WebAppInfo(url="https://wank-exam-bot.onrender.com/webapp")
+        )
+    )
+
     builder.row(
         types.InlineKeyboardButton(text="💻 Computer Science >" if user_lang == 'en' else "💻 ኮምፒውተር ሳይንስ >",
                                    callback_data="dept_cs_menu"),
@@ -211,13 +294,13 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
         await message_or_callback.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# /start ትዕዛዝ[cite: 8]
+# /start ትዕዛዝ
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await show_main_menu(message, message.from_user.id, message.from_user.first_name, edit=False)
 
 
-# ቋንቋ መቀየሪያ ሎጂክ[cite: 8]
+# ቋንቋ መቀየሪያ ሎጂክ
 @dp.callback_query(F.data.startswith("set_lang_"))
 async def set_language(callback: types.CallbackQuery):
     user_id = callback.from_user.id
@@ -351,7 +434,7 @@ async def remedial_menu(callback: types.CallbackQuery):
                                      reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 4. ፈተና መጀመሪያ[cite: 8]
+# 4. ፈተና መጀመሪያ
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
@@ -387,7 +470,6 @@ async def start_specific_exam(callback: types.CallbackQuery):
     pay_key = f"{subject_code}_{full_exam_year}"
     is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
-    # 3ቱ ነጻ ጥያቄዎች ካለቁ እና ክፍያ ካልፈጸመ እንደገና ወደ ኋላ ተመልሶ እንዳይጠቀም መቆለፊያ
     if not is_paid_for_this and (free_used >= 3 or offset_val >= 3):
         conn.close()
         await send_payment_prompt(callback.message, f"{subject_code} ({year_val} {month_val})", pay_key, user_lang)
@@ -456,7 +538,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
         await callback.message.answer(summary_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 5. የክፍያ ጥያቄ ማሳያ (በተመረጠው ቋንቋ)[cite: 8]
+# 5. የክፍያ ጥያቄ ማሳያ
 async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: str, lang: str):
     if lang == 'am':
         pay_text = (
@@ -873,7 +955,7 @@ async def main():
     flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
-    print("🌐 Flask Web Server started successfully on port 8080")
+    print("🌐 Flask Web Server & Mini App started successfully on port 8080")
     print("🚀 WanK Exam Bot is running live!")
     await dp.start_polling(bot)
 
