@@ -54,9 +54,11 @@ def init_db():
         )
     """)
 
+    # የተማሪዎች ሠንጠረዥ (department መረጃን ጨምሮ)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
+            department TEXT DEFAULT 'CS',
             free_questions_used INTEGER DEFAULT 0,
             payment_status TEXT DEFAULT 'free',
             paid_department TEXT DEFAULT ''
@@ -130,7 +132,7 @@ def load_all_exam_datasets():
     print("🎉 ሁሉም የ 2017 እና 2018 የጥር እና ሰኔ ጥያቄዎች ተጭነዋል!")
 
 
-# /start ትዕዛዝ
+# /start ትዕዛዝ - ተማሪው ዲፓርትመንት እንዲመርጥ ማድረግ
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
@@ -138,10 +140,14 @@ async def cmd_start(message: types.Message):
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute(
-        "INSERT OR IGNORE INTO users (user_id, free_questions_used, payment_status, paid_department) VALUES (?, 0, 'free', '')",
-        (user_id,))
-    conn.commit()
+    cursor.execute("SELECT department FROM users WHERE user_id = ?", (user_id,))
+    user_exists = cursor.fetchone()
+
+    if not user_exists:
+        cursor.execute(
+            "INSERT INTO users (user_id, department, free_questions_used, payment_status, paid_department) VALUES (?, 'CS', 0, 'free', '')",
+            (user_id,))
+        conn.commit()
     conn.close()
 
     builder = InlineKeyboardBuilder()
@@ -158,8 +164,8 @@ async def cmd_start(message: types.Message):
         types.InlineKeyboardButton(text="📝 Random Quiz (10 Qs) >", callback_data="rand_start_1_0")
     )
     builder.row(
-        types.InlineKeyboardButton(text="🎧 Help & Support >", callback_data="help_menu"),
-        types.InlineKeyboardButton(text="ℹ️ About Bot >", callback_data="about_bot")
+        types.InlineKeyboardButton(text="⚙️ ዲፓርትመንት ቀይር (Change Dept)", callback_data="change_dept_menu"),
+        types.InlineKeyboardButton(text="🎧 Help & Support >", callback_data="help_menu")
     )
 
     welcome_text = (
@@ -177,10 +183,59 @@ async def cmd_start(message: types.Message):
     )
 
 
+# ዲፓርትመንት መቀየሪያ ሜኑ
+@dp.callback_query(F.data == "change_dept_menu")
+async def change_dept_menu(callback: types.CallbackQuery):
+    await callback.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        types.InlineKeyboardButton(text="💻 Computer Science (CS)", callback_data="set_dept_CS"),
+        types.InlineKeyboardButton(text="📡 Information Technology (IT)", callback_data="set_dept_IT")
+    )
+    builder.row(
+        types.InlineKeyboardButton(text="📚 Freshman", callback_data="set_dept_Freshman"),
+        types.InlineKeyboardButton(text="📖 Remedial", callback_data="set_dept_Remedial")
+    )
+    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+    await callback.message.edit_text("🎯 **እባክዎ ትክክለኛ ዲፓርትመንትዎን ይምረጡ:**", reply_markup=builder.as_markup(),
+                                     parse_mode="Markdown")
+
+
+@dp.callback_query(F.data.startswith("set_dept_"))
+async def set_department_action(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    selected_dept = callback.data.split("_")[2]
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET department = ? WHERE user_id = ?", (selected_dept, user_id))
+    conn.commit()
+    conn.close()
+
+    await callback.answer(f"✅ ዲፓርትመንትዎ ወደ {selected_dept} ተቀይሯል!", show_alert=True)
+    await back_to_menu(callback)
+
+
 # 1. Computer Science ወራትን መምረጫ ሜኑ
 @dp.callback_query(F.data == "dept_cs_menu")
 async def cs_years_menu(callback: types.CallbackQuery):
     await callback.answer()
+    user_id = callback.from_user.id
+
+    # የፈተና ገደብ ቼክ (አድሚን ካልሆነ በስተቀር ተማሪው የራሱን ዲፓርትመንት ብቻ እንዲፈትን)
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT department FROM users WHERE user_id = ?", (user_id,))
+    res = cursor.fetchone()
+    conn.close()
+
+    user_dept = res[0] if res else "CS"
+    if user_id != ADMIN_ID and user_dept != "CS":
+        await callback.answer(
+            f"⚠️ ማስጠንቀቂያ፡ የእርስዎ የተመዘገበበት ዲፓርትመንት '{user_dept}' ስለሆነ የ CS ፈተና መፈተን አይችሉም! (ከፈለጉ ሜኑ ላይ በመሄድ ዲፓርትመንትዎን ይቀይሩ)",
+            show_alert=True)
+        return
+
     builder = InlineKeyboardBuilder()
     builder.row(
         types.InlineKeyboardButton(text="📅 2017 ዓ.ም — ጥር", callback_data="start_exam_CS_2017_ጥር_0_0"),
@@ -200,6 +255,20 @@ async def cs_years_menu(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "dept_it_menu")
 async def it_years_menu(callback: types.CallbackQuery):
     await callback.answer()
+    user_id = callback.from_user.id
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT department FROM users WHERE user_id = ?", (user_id,))
+    res = cursor.fetchone()
+    conn.close()
+
+    user_dept = res[0] if res else "IT"
+    if user_id != ADMIN_ID and user_dept != "IT":
+        await callback.answer(f"⚠️ ማስጠንቀቂያ፡ የእርስዎ የተመዘገበበት ዲፓርትመንት '{user_dept}' ስለሆነ የ IT ፈተና መፈተን አይችሉም!",
+                              show_alert=True)
+        return
+
     builder = InlineKeyboardBuilder()
     builder.row(
         types.InlineKeyboardButton(text="📅 2017 ዓ.ም — ጥር", callback_data="start_exam_IT_2017_ጥር_0_0"),
@@ -231,13 +300,22 @@ async def start_specific_exam(callback: types.CallbackQuery):
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
-                   (user_id,))
+    cursor.execute(
+        "SELECT department, free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
+        (user_id,))
     user_data = cursor.fetchone()
 
-    free_used = user_data[0] if user_data else 0
-    pay_status = user_data[1] if user_data else 'free'
-    paid_depts = user_data[2] if user_data else ''
+    user_dept = user_data[0] if user_data else "CS"
+    free_used = user_data[1] if user_data else 0
+    pay_status = user_data[2] if user_data else 'free'
+    paid_depts = user_data[3] if user_data else ''
+
+    # ተማሪው የሌላ ዲፓርትመንት ፈተና ለመክፈት ሲሞክር (አድሚን ካልሆነ)
+    if user_id != ADMIN_ID and user_dept != subject_code:
+        conn.close()
+        await callback.message.answer(
+            f"⚠️ ይቅርታ! እርስዎ የተመዘገቡት በ **{user_dept}** ዲፓርትመንት ስለሆነ የ **{subject_code}** ፈተና መፈተን አይችሉም።")
+        return
 
     pay_key = f"{subject_code}_{full_exam_year}"
     is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
@@ -318,7 +396,7 @@ async def screenshot_info(callback: types.CallbackQuery):
         "📸 እባክዎ የክፍያ ማረጋገጫ (Screenshot) ምስል በቀጥታ በዚህ ቻት ውስጥ ፎቶውን ይላኩ። አድሚኑ ወዲያውኑ አረጋግጦ ይከፍትልዎታል!")
 
 
-# 5. ተማሪዎች የሚልኩትን የክፍያ ስክሪንሾት መቀበል (ዲፓርትመንት እንዲመርጡ የሚጠይቅ አዲስ አሰራር)
+# 5. ተማሪው ስክሪንሾት ሲልክ የዲፓርትመንት መረጃው ለአድሚን በግልጽ እንዲታይ ማድረግ
 @dp.message(F.photo)
 async def handle_payment_screenshot(message: types.Message):
     user_id = message.from_user.id
@@ -326,10 +404,18 @@ async def handle_payment_screenshot(message: types.Message):
     username = message.from_user.username
     photo_id = message.photo[-1].file_id
 
+    # የተማሪውን ዲፓርትመንት ከዳታቤዝ እናምጣ
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT department FROM users WHERE user_id = ?", (user_id,))
+    res = cursor.fetchone()
+    conn.close()
+
+    student_dept = res[0] if res else "Unknown"
+
     await message.answer("📥 **የክፍያ ስክሪንሾትዎ ደርሷል!** አድሚኑ እስኪያረጋግጠው በጥቂት ደቂቃዎች ውስጥ ይጠብቁ።")
 
     builder = InlineKeyboardBuilder()
-    # የ CS, IT, Freshman እና Remedial አማራጮች ለአድሚን ምርጫ
     builder.row(
         types.InlineKeyboardButton(text="☑️ CS - 2017 ጥር", callback_data=f"toggle_{user_id}_CS_2017_ጥር"),
         types.InlineKeyboardButton(text="☑️ CS - 2017 ሰኔ", callback_data=f"toggle_{user_id}_CS_2017_ሰኔ")
@@ -347,8 +433,8 @@ async def handle_payment_screenshot(message: types.Message):
         types.InlineKeyboardButton(text="☑️ IT - 2018 ሰኔ", callback_data=f"toggle_{user_id}_IT_2018_ሰኔ")
     )
     builder.row(
-        types.InlineKeyboardButton(text="📚 Freshman (Nat/Soc)", callback_data=f"toggle_{user_id}_Freshman_All"),
-        types.InlineKeyboardButton(text="📖 Remedial (Nat/Soc)", callback_data=f"toggle_{user_id}_Remedial_All")
+        types.InlineKeyboardButton(text="📚 Freshman", callback_data=f"toggle_{user_id}_Freshman_All"),
+        types.InlineKeyboardButton(text="📖 Remedial", callback_data=f"toggle_{user_id}_Remedial_All")
     )
     builder.row(types.InlineKeyboardButton(text="🚀 የተመረጡትን አጽድቅ (Approve)", callback_data=f"finalize_app_{user_id}"))
     builder.row(types.InlineKeyboardButton(text="❌ Reject", callback_data=f"rej_{user_id}"))
@@ -356,9 +442,10 @@ async def handle_payment_screenshot(message: types.Message):
     admin_caption = (
         f"🔔 **አዲስ የክፍያ ማረጋገጫ መጥቷል!**\n\n"
         f"👤 የተማሪ ስም: {user_name}\n"
+        f"🎯 **የተማሪው ዲፓርትመንት: {student_dept}** 📌 (እባክዎ ይህንን በማየት ትክክለኛውን ፈተና ያጽድቁ!)\n"
         f"🔗 ዩዘርናም: @{username if username else 'N/A'}\n"
         f"🆔 User ID: `{user_id}`\n\n"
-        f"📌 *እባክዎ ተማሪው የከፈለበትን ዲፓርትመንት/ፈተና ከላይ በመንካት (እየመረጡ) ከዛ 'የተመረጡትን አጽድቅ' የሚለውን ይጫኑ።*"
+        f"📌 *የሚከፈተውን ፈተና ከላይ በመንካት ከዛ 'የተመረጡትን አጽድቅ' የሚለውን ይጫኑ።*"
     )
 
     await bot.send_photo(
@@ -607,7 +694,7 @@ async def progress_handler(callback: types.CallbackQuery):
     await callback.message.edit_text(progress_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 10. Random Quiz (10 ጥያቄዎች በዳታቤዝ ውስጥ ያሉትን በመጠቀም የሚሰራ)
+# 10. Random Quiz (10 ጥያቄዎች በዳታቤዝ ውስጥ ያሉትን በዘፈቀደ የሚያመጣ)
 @dp.callback_query(F.data.startswith("rand_start_"))
 async def random_quiz_start(callback: types.CallbackQuery):
     await callback.answer()
