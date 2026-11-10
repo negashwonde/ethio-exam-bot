@@ -9,7 +9,7 @@ import pandas as pd
 from flask import Flask, render_template_string
 from threading import Thread
 
-# 1. ዌብ ሰርቨር (Flask) ማዋቀር - ለ Mini App እና 24/7 Render አሰራር
+# 1. ዌብ ሰርቨር (Flask) ማዋቀር - ለ Mini App እና Render 24/7 አሰራር
 app = Flask("")
 
 # የ Telegram Mini App ፊት ገጽ (HTML & JavaScript)
@@ -75,7 +75,6 @@ MINI_APP_HTML = """
 
         function openCategory(dept) {
             alert(`You selected ${dept}. Loading exam interface...`);
-            // እዚህ ጋር ወደ ሚፈልጉት ገጽ ወይም API ማዘዋወር ይቻላል
         }
     </script>
 </body>
@@ -88,6 +87,7 @@ def home():
     return "🤖 WanK CS & IT Exit Exam Bot & Mini App is running live and active!"
 
 
+# እዚህ ጋር "Not Found" የሚለውን ችግር የሚፈታው ትክክለኛ የ /webapp ራውት (Route) ተካቷል
 @app.route("/webapp")
 def webapp():
     return render_template_string(MINI_APP_HTML)
@@ -205,7 +205,7 @@ def load_all_exam_datasets():
     print("🎉 ሁሉም የ 2017 እና 2018 የጥር እና ሰኔ ጥያቄዎች ተጭነዋል!")
 
 
-# ዋናውን ሜኑ የሚያሳይ ሄፐር ፈንክشن (የ Mini App በተንን የያዘ)
+# ዋናውን ሜኑ የሚያሳይ ሄፐር ፈንክሽን
 async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -224,8 +224,7 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
 
     builder = InlineKeyboardBuilder()
 
-    # --- Telegram Mini App Button (እዚህ ጋር የ Render ሊንክዎን ያስገቡ) ---
-    # ማስታወሻ: ቦቱ Render ላይ ሲሰራ ሊንኩ https://your-app-name.onrender.com/webapp ይሆናል
+    # --- Telegram Mini App Button (Render ሊንክዎ ሲኖር ከታች ይቀይሩት) ---
     builder.row(
         types.InlineKeyboardButton(
             text="🚀 Open Exam Mini App" if user_lang == 'en' else "🚀 ፈተናውን በ ሚኒ አፕ ክፈት",
