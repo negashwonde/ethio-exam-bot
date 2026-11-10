@@ -14,7 +14,7 @@ app = Flask("")
 
 DB_NAME = "brand_new_exam.db"
 
-# የተሟላ የ Telegram Mini App (Frontend ከቦቱ ሜኑዎች እና ከላኩልኝ ፎቶ ጋር ተመሳሳይ ዲዛይን ያለው)
+# የተሟላ የ Telegram Mini App (Frontend ከዓመት/ወር መምረጫ እና ከ 3 ጥያቄዎች ነጻ ገደብ ጋር)
 MINI_APP_HTML = """
 <!DOCTYPE html>
 <html lang="am">
@@ -34,7 +34,7 @@ MINI_APP_HTML = """
         }
         h1 { color: #38bdf8; font-size: 22px; margin-bottom: 5px; }
         .card {
-            background: rgba(30, 41, 59, 0.85);
+            background: rgba(30, 41, 59, 0.9);
             padding: 15px;
             border-radius: 12px;
             margin-top: 15px;
@@ -80,19 +80,27 @@ MINI_APP_HTML = """
     <h1>🎓 Wank Exam Portal</h1>
     <p id="user-greeting" style="color: #cbd5e1; font-size: 14px;">ሰላም!</p>
 
-    <!-- Main Menu View (ከፎቶው ጋር ተመሳሳይ የሆኑ አማራጮች) -->
+    <!-- Main Menu View -->
     <div id="menu-view" class="card">
-        <div class="info-box">👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:</div>
-        <button class="btn" onclick="openCategory('CS', '2017_ጥር')">💻 ኮምፒውተር ሳይንስ (CS - 2017 ጥር)</button>
-        <button class="btn" onclick="openCategory('CS', '2018_ጥር')">💻 ኮምፒውተር ሳይንስ (CS - 2018 ጥር)</button>
-        <button class="btn" onclick="openCategory('IT', '2017_ጥር')">📚 ኢንፎርሜሽን ቴክኖሎጂ (IT - 2017 ጥር)</button>
-        <button class="btn" onclick="openCategory('IT', '2018_ጥር')">📚 ኢንፎርሜሽን ቴክኖሎጂ (IT - 2018 ጥር)</button>
-        <button class="btn" onclick="alert('📚 Freshman program exams and materials will be updated soon!')">📚 ፍሬሽማን (Freshman)</button>
-        <button class="btn" onclick="alert('📖 Remedial program exams and materials will be updated soon!')">📖 ሬሚዲያል (Remedial)</button>
+        <div class="info-box">👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ዲፓርትመንት ይምረጡ:</div>
+        <button class="btn" onclick="showSubMenu('CS')">💻 Computer Science Exit Exam</button>
+        <button class="btn" onclick="showSubMenu('IT')">📚 Information Technology Exit Exam</button>
+        <button class="btn" onclick="alert('📚 Freshman program exams and materials will be updated soon!')">📚 Freshman Program</button>
+        <button class="btn" onclick="alert('📖 Remedial program exams and materials will be updated soon!')">📖 Remedial Program</button>
         <button class="btn" onclick="alert('📊 የርስዎን ውጤት ለማየት ዋናውን የቴሌግራም ቦት ይጠቀሙ።')">📊 የእኔ ውጤት (My Progress)</button>
         <button class="btn" onclick="alert('📄 የሰነዶች ማቴሪያሎች በቦቱ ውስጥ በሚገኘው ሊንክ ማውረድ ይችላሉ።')">📄 ሰነዶች (ማቴሪያሎች)</button>
         <button class="btn" onclick="alert('ℹ️ WankExamBot ለሁሉም የዩኒቨርሲቲ ተማሪዎች የተዘጋጀ የዝግጅት ረዳት ነው።')">ℹ️ ስለ ቦቱ (About Bot)</button>
         <button class="btn" onclick="alert('🎧 እርዳታ ለማግኘት በስልክ ቁጥር 0919245693 ወይም @neguRoha ያግኙን።')">🎧 እርዳታ እና ድጋፍ (Support)</button>
+    </div>
+
+    <!-- Year & Month SubMenu View (CS ወይም IT ሲጫኑ የሚመጣ) -->
+    <div id="submenu-view" class="card hidden">
+        <h3 id="submenu-title" style="color: #38bdf8;">Select exam year and month:</h3>
+        <button class="btn" onclick="startExam(selectedSubject, '2017_ጥር')">📅 2017 ዓ.ም — Tir</button>
+        <button class="btn" onclick="startExam(selectedSubject, '2017_ሰኔ')">📅 2017 ዓ.ም — Sane</button>
+        <button class="btn" onclick="startExam(selectedSubject, '2018_ጥር')">📅 2018 ዓ.ም — Tir</button>
+        <button class="btn" onclick="startExam(selectedSubject, '2018_ሰኔ')">📅 2018 ዓ.ም — Sane</button>
+        <button class="btn" onclick="backToMenu()" style="background: #475569; margin-top: 15px;">🏠 ዋና ማውጫ (Main Menu)</button>
     </div>
 
     <!-- Exam View -->
@@ -108,6 +116,19 @@ MINI_APP_HTML = """
         <p id="explanation" style="margin-top: 15px; font-size: 14px; color: #38bdf8;"></p>
         <button id="next-btn" class="btn hidden" onclick="loadNextQuestion()" style="text-align: center;">ቀጣይ ጥያቄ ➡️</button>
         <button class="btn" onclick="backToMenu()" style="background: #475569; text-align: center; margin-top: 10px;">🏠 ዋና ማውጫ</button>
+    </div>
+
+    <!-- Payment Prompt View -->
+    <div id="payment-view" class="card hidden" style="text-align: center;">
+        <h2 style="color: #f87171;">🔒 3ቱን ነጻ ጥያቄዎች ጨርሰዋል!</h2>
+        <p style="font-size: 14px; line-height: 1.6; text-align: left; background: #1e293b; padding: 12px; border-radius: 8px;">
+            🎓 ሙሉ ጥያቄዎች እና ማብራሪያዎች ክፍያ መፈጸም አለብዎት።<br>
+            💰 <b>ክፍያው 50 Birr ብቻ ነው!</b><br><br>
+            🏦 <b>CBE:</b> <code>1000268717823</code> (ነጋሽ ወንዴ)<br>
+            📱 <b>Telebirr:</b> <code>0919245693</code> (ነጋሽ ወንዴ)<br><br>
+            📸 <b>ክፍያ ከፈጸሙ በኋላ ስክሪንሾቱን ወደ ቴሌግራም ቦቱ ይላኩ! አድሚኑ ሲያጸድቅልዎ ሙሉው ጥያቄ ይከፈታል።</b>
+        </p>
+        <button class="btn" onclick="backToMenu()" style="text-align: center;">🏠 ዋና ማውጫ ተመለስ</button>
     </div>
 
     <!-- Result View -->
@@ -127,20 +148,27 @@ MINI_APP_HTML = """
             document.getElementById('user-greeting').innerText = `👋 ሰላም, ${user.first_name}!`;
         }
 
-        let currentSubject = '';
+        let selectedSubject = '';
         let currentYear = '';
         let questionsList = [];
         let currentIndex = 0;
         let score = 0;
 
-        function openCategory(subj, year) {
-            currentSubject = subj;
+        function showSubMenu(subj) {
+            selectedSubject = subj;
+            document.getElementById('menu-view').classList.add('hidden');
+            document.getElementById('submenu-title').innerText = `${subj === 'CS' ? 'Computer Science' : 'Information Technology'} Exit Exam\nSelect exam year and month:`;
+            document.getElementById('submenu-view').classList.remove('hidden');
+        }
+
+        function startExam(subj, year) {
             currentYear = year;
             fetch(`/api/questions?subject=${subj}&year=${year}&user_id=${userId}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.locked) {
-                        alert("🔒 3ቱን ነጻ ጥያቄዎች ጨርሰዋል! ሙሉ ፈተናውን ለመክፈት እባክዎ በቦቱ በኩል ክፍያ ፈጽመው ስክሪንሾት ይላኩ።");
+                        document.getElementById('submenu-view').classList.add('hidden');
+                        document.getElementById('payment-view').classList.remove('hidden');
                         return;
                     }
                     questionsList = data.questions;
@@ -150,7 +178,7 @@ MINI_APP_HTML = """
                     }
                     currentIndex = 0;
                     score = 0;
-                    document.getElementById('menu-view').classList.add('hidden');
+                    document.getElementById('submenu-view').classList.add('hidden');
                     document.getElementById('exam-view').classList.remove('hidden');
                     showQuestion();
                 });
@@ -192,10 +220,15 @@ MINI_APP_HTML = """
             fetch('/api/answer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId, question_id: q.id, selected: selectedOpt })
+                body: JSON.stringify({ user_id: userId, question_id: q.id, selected: selectedOpt, subject: selectedSubject, year: currentYear })
             })
             .then(res => res.json())
             .then(data => {
+                if (data.locked) {
+                    document.getElementById('exam-view').classList.add('hidden');
+                    document.getElementById('payment-view').classList.remove('hidden');
+                    return;
+                }
                 if (data.is_correct) {
                     score++;
                     document.getElementById(`btn-${selectedOpt.toLowerCase()}`).classList.add('correct');
@@ -215,7 +248,9 @@ MINI_APP_HTML = """
 
         function backToMenu() {
             document.getElementById('exam-view').classList.add('hidden');
+            document.getElementById('payment-view').classList.add('hidden');
             document.getElementById('result-view').classList.add('hidden');
+            document.getElementById('submenu-view').classList.add('hidden');
             document.getElementById('menu-view').classList.remove('hidden');
         }
     </script>
@@ -253,7 +288,7 @@ def api_questions():
     pay_key = f"{subj}_{year}"
     is_paid = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
-    # ነጻ 3 ጥያቄዎች ካለቁ እና አድሚኑ ካልፈቀደ (ክፍያ ካልጸደቀ)
+    # ነጻ 3 ጥያቄዎች ካለቁ እና ክፍያ ካልጸደቀ
     if not is_paid and free_used >= 3:
         conn.close()
         return jsonify({"locked": True, "questions": []})
@@ -280,24 +315,36 @@ def api_answer():
     user_id = data.get("user_id")
     q_id = data.get("question_id")
     selected = data.get("selected")
+    subj = data.get("subject")
+    year = data.get("year")
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+
+    # የክፍያ ሁኔታን እንደገና ማረጋገጥ
+    cursor.execute("SELECT free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
+                   (user_id,))
+    res_user = cursor.fetchone()
+    if res_user:
+        free_used, pay_status, paid_depts = res_user
+        pay_key = f"{subj}_{year}"
+        is_paid = pay_status == 'paid' and pay_key in paid_depts.split(",")
+        if not is_paid and free_used >= 3:
+            conn.close()
+            return jsonify({"locked": True})
+
+        if not is_paid:
+            cursor.execute("UPDATE users SET free_questions_used = free_questions_used + 1 WHERE user_id = ?",
+                           (user_id,))
+            conn.commit()
+
     cursor.execute("SELECT correct_answer FROM questions WHERE id = ?", (q_id,))
     res = cursor.fetchone()
     correct_ans = res[0] if res else "A"
 
     is_correct = (selected == correct_ans)
-
-    # ነጻ ጥያቄዎች ብዛት ማዘመን
-    cursor.execute("SELECT free_questions_used FROM users WHERE user_id = ?", (user_id,))
-    u_res = cursor.fetchone()
-    if u_res and u_res[0] < 3:
-        cursor.execute("UPDATE users SET free_questions_used = free_questions_used + 1 WHERE user_id = ?", (user_id,))
-        conn.commit()
-
     conn.close()
-    return jsonify({"is_correct": is_correct, "correct_answer": correct_ans})
+    return jsonify({"is_correct": is_correct, "correct_answer": correct_ans, "locked": False})
 
 
 def run_flask():
