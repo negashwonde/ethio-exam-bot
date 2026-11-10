@@ -87,7 +87,6 @@ def home():
     return "🤖 WanK CS & IT Exit Exam Bot & Mini App is running live and active!"
 
 
-# እዚህ ጋር "Not Found" የሚለውን ችግር የሚፈታው ትክክለኛ የ /webapp ራውት (Route) ተካቷል
 @app.route("/webapp")
 def webapp():
     return render_template_string(MINI_APP_HTML)
@@ -224,11 +223,11 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
 
     builder = InlineKeyboardBuilder()
 
-    # --- Telegram Mini App Button (Render ሊንክዎ ሲኖር ከታች ይቀይሩት) ---
+    # --- Telegram Mini App Button (Render ሊንክዎ ተጨምሯል) ---
     builder.row(
         types.InlineKeyboardButton(
             text="🚀 Open Exam Mini App" if user_lang == 'en' else "🚀 ፈተናውን በ ሚኒ አፕ ክፈት",
-            web_app=types.WebAppInfo(url="https://wank-exam-bot.onrender.com/webapp")
+            web_app=types.WebAppInfo(url="https://ethio-exam-bot-882d.onrender.com/webapp")
         )
     )
 
@@ -293,13 +292,13 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
         await message_or_callback.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# /start ትዕዛዝ
+# /start ትዕዛዝ[cite: 8]
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await show_main_menu(message, message.from_user.id, message.from_user.first_name, edit=False)
 
 
-# ቋንቋ መቀየሪያ ሎጂክ
+# ቋንቋ መቀየሪያ ሎጂክ[cite: 8]
 @dp.callback_query(F.data.startswith("set_lang_"))
 async def set_language(callback: types.CallbackQuery):
     user_id = callback.from_user.id
@@ -433,7 +432,7 @@ async def remedial_menu(callback: types.CallbackQuery):
                                      reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 4. ፈተና መጀመሪያ
+# 4. ፈተና መጀመሪያ[cite: 8]
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
@@ -469,6 +468,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
     pay_key = f"{subject_code}_{full_exam_year}"
     is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
+    # ክፍያ ካልፈጸመ እና 3ቱ ነጻ ጥያቄዎች ካለቁ (ወይም ወደ ኋላ ተመልሶ ለመጠቀም ከሞከረ) እንደገና እንዳይጠቀም መቆለፊያ
     if not is_paid_for_this and (free_used >= 3 or offset_val >= 3):
         conn.close()
         await send_payment_prompt(callback.message, f"{subject_code} ({year_val} {month_val})", pay_key, user_lang)
@@ -537,7 +537,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
         await callback.message.answer(summary_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 5. የክፍያ ጥያቄ ማሳያ
+# 5. የክፍያ ጥያቄ ማሳያ (በተመረጠው ቋንቋ)[cite: 8]
 async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: str, lang: str):
     if lang == 'am':
         pay_text = (
