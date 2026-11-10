@@ -130,7 +130,7 @@ def load_all_exam_datasets():
     print("🎉 ሁሉም የ 2017 እና 2018 የጥር እና ሰኔ ጥያቄዎች ተጭነዋል!")
 
 
-# /start ትዕዛዝ (ስፓም እና የሩሲያኛ ማስታወቂያ እንዳይመጣ በንጹህ ቴክስት ብቻ የተሰራ)
+# /start ትዕዛዝ
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
@@ -215,15 +215,15 @@ async def it_years_menu(callback: types.CallbackQuery):
     await callback.message.edit_text(text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 3. ፈተና መጀመሪያ (በ OFFSET እና በትክክለኛው የ Score/ጥያቄ ቆጠራ)
+# 3. ፈተና መጀመሪያ
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
     user_id = callback.from_user.id
     parts = callback.data.split("_")
-    subject_code = parts[2]  # CS ወይም IT
-    year_val = parts[3]  # 2017 ወይም 2018
-    month_val = parts[4]  # ጥር ወይም ሰኔ
+    subject_code = parts[2]
+    year_val = parts[3]
+    month_val = parts[4]
     offset_val = int(parts[5]) if len(parts) > 5 else 0
     current_score = int(parts[6]) if len(parts) > 6 else 0
 
@@ -242,7 +242,6 @@ async def start_specific_exam(callback: types.CallbackQuery):
     pay_key = f"{subject_code}_{full_exam_year}"
     is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
-    # ነጻው ገደብ (3) ካለቀ እና ክፍያ ካልፈጸመ
     if not is_paid_for_this and free_used >= 3 and offset_val >= 3:
         conn.close()
         await send_payment_prompt(callback.message, f"{subject_code} ({year_val} {month_val})", pay_key)
@@ -281,7 +280,6 @@ async def start_specific_exam(callback: types.CallbackQuery):
             reply_markup=builder.as_markup(), parse_mode="Markdown"
         )
     else:
-        # ፈተናው ሲያልቅ አጠቃላይ ውጤቱን ከ 100 አሳይ
         percentage = int((current_score / offset_val) * 100) if offset_val > 0 else 0
         builder = InlineKeyboardBuilder()
         builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
@@ -320,7 +318,7 @@ async def screenshot_info(callback: types.CallbackQuery):
         "📸 እባክዎ የክፍያ ማረጋገጫ (Screenshot) ምስል በቀጥታ በዚህ ቻት ውስጥ ፎቶውን ይላኩ። አድሚኑ ወዲያውኑ አረጋግጦ ይከፍትልዎታል!")
 
 
-# 5. ተማሪዎች የሚልኩትን የክፍያ ስክሪንሾት መቀበል
+# 5. ተማሪዎች የሚልኩትን የክፍያ ስክሪንሾት መቀበል (ዲፓርትመንት እንዲመርጡ የሚጠይቅ አዲስ አሰራር)
 @dp.message(F.photo)
 async def handle_payment_screenshot(message: types.Message):
     user_id = message.from_user.id
@@ -331,6 +329,7 @@ async def handle_payment_screenshot(message: types.Message):
     await message.answer("📥 **የክፍያ ስክሪንሾትዎ ደርሷል!** አድሚኑ እስኪያረጋግጠው በጥቂት ደቂቃዎች ውስጥ ይጠብቁ።")
 
     builder = InlineKeyboardBuilder()
+    # የ CS, IT, Freshman እና Remedial አማራጮች ለአድሚን ምርጫ
     builder.row(
         types.InlineKeyboardButton(text="☑️ CS - 2017 ጥር", callback_data=f"toggle_{user_id}_CS_2017_ጥር"),
         types.InlineKeyboardButton(text="☑️ CS - 2017 ሰኔ", callback_data=f"toggle_{user_id}_CS_2017_ሰኔ")
@@ -347,15 +346,19 @@ async def handle_payment_screenshot(message: types.Message):
         types.InlineKeyboardButton(text="☑️ IT - 2018 ጥር", callback_data=f"toggle_{user_id}_IT_2018_ጥር"),
         types.InlineKeyboardButton(text="☑️ IT - 2018 ሰኔ", callback_data=f"toggle_{user_id}_IT_2018_ሰኔ")
     )
+    builder.row(
+        types.InlineKeyboardButton(text="📚 Freshman (Nat/Soc)", callback_data=f"toggle_{user_id}_Freshman_All"),
+        types.InlineKeyboardButton(text="📖 Remedial (Nat/Soc)", callback_data=f"toggle_{user_id}_Remedial_All")
+    )
     builder.row(types.InlineKeyboardButton(text="🚀 የተመረጡትን አጽድቅ (Approve)", callback_data=f"finalize_app_{user_id}"))
     builder.row(types.InlineKeyboardButton(text="❌ Reject", callback_data=f"rej_{user_id}"))
 
     admin_caption = (
         f"🔔 **አዲስ የክፍያ ማረጋገጫ መጥቷል!**\n\n"
-        f"👤 ስም: {user_name}\n"
+        f"👤 የተማሪ ስም: {user_name}\n"
         f"🔗 ዩዘርናም: @{username if username else 'N/A'}\n"
         f"🆔 User ID: `{user_id}`\n\n"
-        f"📌 *እባክዎ የሚፈልጉትን ፈተና/ክፍል ከላይ በመንካት (እየመረጡ) ከዛ 'የተመረጡትን አጽድቅ' የሚለውን ይጫኑ።*"
+        f"📌 *እባክዎ ተማሪው የከፈለበትን ዲፓርትመንት/ፈተና ከላይ በመንካት (እየመረጡ) ከዛ 'የተመረጡትን አጽድቅ' የሚለውን ይጫኑ።*"
     )
 
     await bot.send_photo(
@@ -379,9 +382,10 @@ async def admin_toggle_selection(callback: types.CallbackQuery):
     parts = callback.data.split("_")
     target_user_id = int(parts[1])
     dept_code = parts[2]
-    year_val = parts[3]
-    period = parts[4]
-    key = f"{dept_code}_{year_val}_{period}"
+    year_val = parts[3] if len(parts) > 3 else ""
+    period = parts[4] if len(parts) > 4 else ""
+
+    key = f"{dept_code}_{year_val}_{period}" if period else f"{dept_code}"
 
     if target_user_id not in admin_selections:
         admin_selections[target_user_id] = set()
@@ -404,7 +408,7 @@ async def admin_finalize_approve(callback: types.CallbackQuery):
     selected_keys = admin_selections.get(target_user_id, set())
 
     if not selected_keys:
-        await callback.answer("⚠️ እባክዎ ቢያንስ አንድ ኮርስ/ወር ይምረጡ!", show_alert=True)
+        await callback.answer("⚠️ እባክዎ ቢያንስ አንድ ዲፓርትመንት ወይም ኮርስ ይምረጡ!", show_alert=True)
         return
 
     conn = sqlite3.connect(DB_NAME)
@@ -436,7 +440,7 @@ async def admin_finalize_approve(callback: types.CallbackQuery):
         builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
         await bot.send_message(
             target_user_id,
-            f"🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)። አሁን የተመረጡት ሙሉ ጥያቄዎች ተከፍተውልዎታል! 🚀",
+            f"🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)። አሁን የተመረጡት ዲፓርትመንቶች ተከፍተውልዎታል! 🚀",
             reply_markup=builder.as_markup(),
             parse_mode="Markdown"
         )
@@ -471,7 +475,6 @@ async def check_answer(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
     parts = callback.data.split("_")
-    # format: ans_{subj}_{year}_{month}_{offset}_{q_id}_{current_score}_{chosen_opt}
     subject_code = parts[1]
     year_val = parts[2]
     month_val = parts[3]
@@ -604,7 +607,7 @@ async def progress_handler(callback: types.CallbackQuery):
     await callback.message.edit_text(progress_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 10. Random Quiz (10 ጥያቄዎች በነጻ እና ትክክለኛ ውጤት ማሳያ)
+# 10. Random Quiz (10 ጥያቄዎች በዳታቤዝ ውስጥ ያሉትን በመጠቀም የሚሰራ)
 @dp.callback_query(F.data.startswith("rand_start_"))
 async def random_quiz_start(callback: types.CallbackQuery):
     await callback.answer()
