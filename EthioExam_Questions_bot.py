@@ -132,7 +132,7 @@ def load_all_exam_datasets():
     print("🎉 ሁሉም የ 2017 እና 2018 የጥር እና ሰኔ ጥያቄዎች ተጭነዋል!")
 
 
-# ዋናውን ሜኑ የሚያሳይ ሄፐር ፈንክሽን (ቋንቋውን በትክክል እየቀየረ የሚያሳይ)
+# ዋናውን ሜኑ የሚያሳይ ሄፐር ፈንክሽን
 async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -182,7 +182,6 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
         types.InlineKeyboardButton(text="🎧 Help & Support >" if user_lang == 'en' else "🎧 እርዳታ እና ድጋፍ >",
                                    callback_data="help_menu")
     )
-    # ሁለቱ የተናጠል የቋንቋ በተኖች (Amh እና Eng)[cite: 8]
     builder.row(
         types.InlineKeyboardButton(text="🇪🇹 አማርኛ", callback_data="set_lang_am"),
         types.InlineKeyboardButton(text="🇬🇧 English", callback_data="set_lang_en")
@@ -218,7 +217,7 @@ async def cmd_start(message: types.Message):
     await show_main_menu(message, message.from_user.id, message.from_user.first_name, edit=False)
 
 
-# ቋንቋ መቀየሪያ ሎጂክ (Amh ወይም Eng ሲነካ ወዲያውኑ ቋንቋውን ቀይሮ ሜኑውን ያሳያል)[cite: 8]
+# ቋንቋ መቀየሪያ ሎጂክ[cite: 8]
 @dp.callback_query(F.data.startswith("set_lang_"))
 async def set_language(callback: types.CallbackQuery):
     user_id = callback.from_user.id
@@ -352,7 +351,7 @@ async def remedial_menu(callback: types.CallbackQuery):
                                      reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 4. ፈተና መጀመሪያ (Questions in English only)[cite: 8]
+# 4. ፈተና መጀመሪያ[cite: 8]
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
@@ -369,19 +368,20 @@ async def start_specific_exam(callback: types.CallbackQuery):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT department, free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
+        "SELECT department, lang, free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
         (user_id,))
     user_data = cursor.fetchone()
 
     user_dept = user_data[0] if user_data else "CS"
-    free_used = user_data[1] if user_data else 0
-    pay_status = user_data[2] if user_data else 'free'
-    paid_depts = user_data[3] if user_data else ''
+    user_lang = user_data[1] if user_data else "am"
+    free_used = user_data[2] if user_data else 0
+    pay_status = user_data[3] if user_data else 'free'
+    paid_depts = user_data[4] if user_data else ''
 
     if user_id != ADMIN_ID and user_dept != subject_code:
         conn.close()
-        await callback.message.answer(
-            f"⚠️ Sorry! You are registered in **{user_dept}**, so you cannot take **{subject_code}** exams.")
+        err_msg = f"⚠️ ይቅርታ! እርስዎ የተመዘገቡት በ **{user_dept}** ስለሆነ የ **{subject_code}** ፈተና መፈተን አይችሉም።" if user_lang == 'am' else f"⚠️ Sorry! You are registered in **{user_dept}**, so you cannot take **{subject_code}** exams."
+        await callback.message.answer(err_msg)
         return
 
     pay_key = f"{subject_code}_{full_exam_year}"
@@ -389,7 +389,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
 
     if not is_paid_for_this and free_used >= 3 and offset_val >= 3:
         conn.close()
-        await send_payment_prompt(callback.message, f"{subject_code} ({year_val} {month_val})", pay_key)
+        await send_payment_prompt(callback.message, f"{subject_code} ({year_val} {month_val})", pay_key, user_lang)
         return
 
     cursor.execute(
@@ -411,14 +411,22 @@ async def start_specific_exam(callback: types.CallbackQuery):
                                                callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_C"))
         builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}",
                                                callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_D"))
+
+        bm_text = "🔖 ማስቀመጫ (Bookmark)" if user_lang == 'am' else "🔖 Bookmark"
+        menu_text = "🏠 ዋና ማውጫ" if user_lang == 'am' else "🏠 Main Menu"
+
         builder.row(
-            types.InlineKeyboardButton(text="🔖 Bookmark", callback_data=f"bm_{q_id}"),
-            types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu")
+            types.InlineKeyboardButton(text=bm_text, callback_data=f"bm_{q_id}"),
+            types.InlineKeyboardButton(text=menu_text, callback_data="back_menu")
         )
 
         q_num_display = offset_val + 1
-        rem_text = f" (Free Qs left: {3 - free_used})" if not is_paid_for_this else " (VIP Unlocked 🌟)"
-        score_display = f" | Score: {current_score}/{offset_val}" if offset_val > 0 else ""
+        if user_lang == 'am':
+            rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - free_used})" if not is_paid_for_this else " (VIP የተከፈተ 🌟)"
+            score_display = f" | ውጤት: {current_score}/{offset_val}" if offset_val > 0 else ""
+        else:
+            rem_text = f" (Free Qs left: {3 - free_used})" if not is_paid_for_this else " (VIP Unlocked 🌟)"
+            score_display = f" | Score: {current_score}/{offset_val}" if offset_val > 0 else ""
 
         await callback.message.answer(
             f"📝 **{subject_code} ({year_val} {month_val}) Exit Exam — Q{q_num_display}{score_display}{rem_text}:**\n\n{q_text}",
@@ -427,32 +435,56 @@ async def start_specific_exam(callback: types.CallbackQuery):
     else:
         percentage = int((current_score / offset_val) * 100) if offset_val > 0 else 0
         builder = InlineKeyboardBuilder()
-        builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+        menu_text = "🏠 ዋና ማውጫ" if user_lang == 'am' else "🏠 Main Menu"
+        builder.row(types.InlineKeyboardButton(text=menu_text, callback_data="back_menu"))
 
-        summary_text = (
-            f"🎉 **Congratulations!** You have completed all questions in this category.\n\n"
-            f"📊 **Final Score:**\n"
-            f"✅ Correct Answers: **{current_score}/{offset_val}**\n"
-            f"💯 Percentage: **{percentage}%**"
-        )
+        if user_lang == 'am':
+            summary_text = (
+                f"🎉 **እንኳን ደስ አለዎት!** በዚህ ምድብ ያሉትን ጥያቄዎች በሙሉ አጠናቀዋል።\n\n"
+                f"📊 **የእርስዎ ውጤት:**\n"
+                f"✅ ትክክለኛ መልሶች: **{current_score}/{offset_val}**\n"
+                f"💯 መቶኛ: **{percentage}%**"
+            )
+        else:
+            summary_text = (
+                f"🎉 **Congratulations!** You have completed all questions in this category.\n\n"
+                f"📊 **Final Score:**\n"
+                f"✅ Correct Answers: **{current_score}/{offset_val}**\n"
+                f"💯 Percentage: **{percentage}%**"
+            )
         await callback.message.answer(summary_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 5. የክፍያ ጥያቄ ማሳያ
-async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: str):
-    pay_text = (
-        f"🔒 **You have used your 3 free questions!**\n\n"
-        f"🎓 Please make a payment to unlock full questions and explanations for **{dept_name}**.\n"
-        f"💰 **Fee: 50 Birr only!**\n\n"
-        f"Official payment accounts:\n\n"
-        f"🏦 **CBE (Commercial Bank of Ethiopia):** `1000268717823` (Negash Wonde)\n"
-        f"📱 **Telebirr:** `0919245693` (Negash Wonde)\n\n"
-        f"📸 Send your payment screenshot to this bot after paying!"
-    )
+# 5. የክፍያ ጥያቄ ማሳያ (በተመረጠው ቋንቋ)[cite: 8]
+async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: str, lang: str):
+    if lang == 'am':
+        pay_text = (
+            f"🔒 **3ቱን ነጻ ጥያቄዎች ጨርሰዋል!**\n\n"
+            f"🎓 ለ **{dept_name}** ሙሉ ጥያቄዎች እና ማብራሪያዎች ክፍያ መፈጸም አለብዎት።\n"
+            f"💰 **ክፍያው 50 Birr ብቻ ነው!**\n\n"
+            f"ኦፊሴላዊ የክፍያ አካውንቶች:\n\n"
+            f"🏦 **ኢትዮጵያ ንግድ ባንክ (CBE):** `1000268717823` (ነጋሽ ወንዴ)\n"
+            f"📱 **ቴሌብር (Telebirr):** `0919245693` (ነጋሽ ወንዴ)\n\n"
+            f"📸 ክፍያ ከፈጸሙ በኋላ የክፍያ ማረጋገጫ (Screenshot) ፎቶ ወደዚህ ቦት ይላኩ!"
+        )
+        btn_screenshot = "📤 ስክሪንሾት ላክ (አድሚን እንዲያይ)"
+        btn_menu = "🏠 ዋና ማውጫ"
+    else:
+        pay_text = (
+            f"🔒 **You have used your 3 free questions!**\n\n"
+            f"🎓 Please make a payment to unlock full questions and explanations for **{dept_name}**.\n"
+            f"💰 **Fee: 50 Birr only!**\n\n"
+            f"Official payment accounts:\n\n"
+            f"🏦 **CBE (Commercial Bank of Ethiopia):** `1000268717823` (Negash Wonde)\n"
+            f"📱 **Telebirr:** `0919245693` (Negash Wonde)\n\n"
+            f"📸 Send your payment screenshot to this bot after paying!"
+        )
+        btn_screenshot = "📤 Send Screenshot (Admin)"
+        btn_menu = "🏠 Main Menu"
+
     builder = InlineKeyboardBuilder()
-    builder.row(
-        types.InlineKeyboardButton(text="📤 Send Screenshot (Admin)", callback_data=f"upload_screenshot_info_{pay_key}"))
-    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+    builder.row(types.InlineKeyboardButton(text=btn_screenshot, callback_data=f"upload_screenshot_info_{pay_key}"))
+    builder.row(types.InlineKeyboardButton(text=btn_menu, callback_data="back_menu"))
     await message.answer(pay_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
@@ -460,10 +492,10 @@ async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: s
 async def screenshot_info(callback: types.CallbackQuery):
     await callback.answer()
     await callback.message.answer(
-        "📸 Please send your payment screenshot photo directly in this chat. The admin will verify and unlock it shortly!")
+        "📸 እባክዎ የክፍያ ማረጋገጫ (Screenshot) ምስል በቀጥታ በዚህ ቻት ውስጥ ፎቶውን ይላኩ። አድሚኑ ወዲያውኑ አረጋግጦ ይከፍትልዎታል! / Please send your payment screenshot photo directly in this chat.")
 
 
-# 6. ተማሪው ስክሪንሾት ሲልክ (ከዲፓርትመንት መረጃ ጋር)
+# 6. ተማሪው ስክሪንሾት ሲልክ
 @dp.message(F.photo)
 async def handle_payment_screenshot(message: types.Message):
     user_id = message.from_user.id
@@ -479,39 +511,39 @@ async def handle_payment_screenshot(message: types.Message):
 
     student_dept = res[0] if res else "Unknown"
 
-    await message.answer("📥 **Payment screenshot received!** Please wait a few moments while the admin verifies it.")
+    await message.answer("📥 **የክፍያ ስክሪንሾትዎ ደርሷል!** አድሚኑ እስኪያረጋግጠው በጥቂት ደቂቃዎች ውስጥ ይጠብቁ።")
 
     builder = InlineKeyboardBuilder()
     builder.row(
-        types.InlineKeyboardButton(text="☑️ CS - 2017 Tir", callback_data=f"toggle_{user_id}_CS_2017_ጥር"),
-        types.InlineKeyboardButton(text="☑️ CS - 2017 Sane", callback_data=f"toggle_{user_id}_CS_2017_ሰኔ")
+        types.InlineKeyboardButton(text="☑️ CS - 2017 ጥር", callback_data=f"toggle_{user_id}_CS_2017_ጥር"),
+        types.InlineKeyboardButton(text="☑️ CS - 2017 ሰኔ", callback_data=f"toggle_{user_id}_CS_2017_ሰኔ")
     )
     builder.row(
-        types.InlineKeyboardButton(text="☑️ CS - 2018 Tir", callback_data=f"toggle_{user_id}_CS_2018_ጥር"),
-        types.InlineKeyboardButton(text="☑️ CS - 2018 Sane", callback_data=f"toggle_{user_id}_CS_2018_ሰኔ")
+        types.InlineKeyboardButton(text="☑️ CS - 2018 ጥር", callback_data=f"toggle_{user_id}_CS_2018_ጥር"),
+        types.InlineKeyboardButton(text="☑️ CS - 2018 ሰኔ", callback_data=f"toggle_{user_id}_CS_2018_ሰኔ")
     )
     builder.row(
-        types.InlineKeyboardButton(text="☑️ IT - 2017 Tir", callback_data=f"toggle_{user_id}_IT_2017_ጥር"),
-        types.InlineKeyboardButton(text="☑️ IT - 2017 Sane", callback_data=f"toggle_{user_id}_IT_2017_ሰኔ")
+        types.InlineKeyboardButton(text="☑️ IT - 2017 ጥር", callback_data=f"toggle_{user_id}_IT_2017_ጥር"),
+        types.InlineKeyboardButton(text="☑️ IT - 2017 ሰኔ", callback_data=f"toggle_{user_id}_IT_2017_ሰኔ")
     )
     builder.row(
-        types.InlineKeyboardButton(text="☑️ IT - 2018 Tir", callback_data=f"toggle_{user_id}_IT_2018_ጥር"),
-        types.InlineKeyboardButton(text="☑️ IT - 2018 Sane", callback_data=f"toggle_{user_id}_IT_2018_ሰኔ")
+        types.InlineKeyboardButton(text="☑️ IT - 2018 ጥር", callback_data=f"toggle_{user_id}_IT_2018_ጥር"),
+        types.InlineKeyboardButton(text="☑️ IT - 2018 ሰኔ", callback_data=f"toggle_{user_id}_IT_2018_ሰኔ")
     )
     builder.row(
         types.InlineKeyboardButton(text="📚 Freshman", callback_data=f"toggle_{user_id}_Freshman_All"),
         types.InlineKeyboardButton(text="📖 Remedial", callback_data=f"toggle_{user_id}_Remedial_All")
     )
-    builder.row(types.InlineKeyboardButton(text="🚀 Approve Selected", callback_data=f"finalize_app_{user_id}"))
-    builder.row(types.InlineKeyboardButton(text="❌ Reject", callback_data=f"rej_{user_id}"))
+    builder.row(types.InlineKeyboardButton(text="🚀 የተመረጡትን አጽድቅ (Approve)", callback_data=f"finalize_app_{user_id}"))
+    builder.row(types.InlineKeyboardButton(text="❌ ውድቅ አድርግ (Reject)", callback_data=f"rej_{user_id}"))
 
     admin_caption = (
-        f"🔔 **New Payment Screenshot Received!**\n\n"
-        f"👤 Student Name: {user_name}\n"
-        f"🎯 **Student Department: {student_dept}** 📌 (Verify this before approving!)\n"
-        f"🔗 Username: @{username if username else 'N/A'}\n"
+        f"🔔 **አዲስ የክፍያ ማረጋገጫ መጥቷል!**\n\n"
+        f"👤 የተማሪ ስም: {user_name}\n"
+        f"🎯 **የተማሪው ዲፓርትመንት: {student_dept}** 📌 (እባክዎ ይህንን በማየት ትክክለኛውን ፈተና ያጽድቁ!)\n"
+        f"🔗 ዩዘርናም: @{username if username else 'N/A'}\n"
         f"🆔 User ID: `{user_id}`\n\n"
-        f"📌 *Select the exam/department to unlock and click 'Approve Selected'.*"
+        f"📌 *የሚከፈተውን ፈተና ከላይ በመንካት ከዛ 'የተመረጡትን አጽድቅ' የሚለውን ይጫኑ።*"
     )
 
     await bot.send_photo(
@@ -529,7 +561,7 @@ admin_selections = {}
 @dp.callback_query(F.data.startswith("toggle_"))
 async def admin_toggle_selection(callback: types.CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
-        await callback.answer("⚠️ Admin only!", show_alert=True)
+        await callback.answer("⚠️ አድሚኑ ብቻ ነው!", show_alert=True)
         return
 
     parts = callback.data.split("_")
@@ -545,23 +577,23 @@ async def admin_toggle_selection(callback: types.CallbackQuery):
 
     if key in admin_selections[target_user_id]:
         admin_selections[target_user_id].remove(key)
-        await callback.answer(f"❌ {key} removed")
+        await callback.answer(f"❌ {key} ተሰርዟል")
     else:
         admin_selections[target_user_id].add(key)
-        await callback.answer(f"✅ {key} selected")
+        await callback.answer(f"✅ {key} ተመርጧል")
 
 
 @dp.callback_query(F.data.startswith("finalize_app_"))
 async def admin_finalize_approve(callback: types.CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
-        await callback.answer("⚠️ Admin only!", show_alert=True)
+        await callback.answer("⚠️ አድሚኑ ብቻ ነው!", show_alert=True)
         return
 
     target_user_id = int(callback.data.split("_")[2])
     selected_keys = admin_selections.get(target_user_id, set())
 
     if not selected_keys:
-        await callback.answer("⚠️ Please select at least one department or course!", show_alert=True)
+        await callback.answer("⚠️ እባክዎ ቢያንስ አንድ ዲፓርትመንት ወይም ኮርስ ይምረጡ!", show_alert=True)
         return
 
     conn = sqlite3.connect(DB_NAME)
@@ -586,14 +618,14 @@ async def admin_finalize_approve(callback: types.CallbackQuery):
         caption=callback.message.caption + f"\n\n✅ **[APPROVED: {', '.join(selected_keys)} ✅]**",
         reply_markup=None
     )
-    await callback.answer("Approved successfully!")
+    await callback.answer("ክፍያው በተሳካ ሁኔታ ጸድቋል!")
 
     try:
         builder = InlineKeyboardBuilder()
-        builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+        builder.row(types.InlineKeyboardButton(text="🏠 ዋና ማውጫ", callback_data="back_menu"))
         await bot.send_message(
             target_user_id,
-            f"🎉 **Congratulations!** Your payment has been approved by the admin. Your exams are now unlocked! 🚀",
+            f"🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)። አሁን የተመረጡት ዲፓርትመንቶች ተከፍተውልዎታል! 🚀",
             reply_markup=builder.as_markup(),
             parse_mode="Markdown"
         )
@@ -604,7 +636,7 @@ async def admin_finalize_approve(callback: types.CallbackQuery):
 @dp.callback_query(F.data.startswith("rej_"))
 async def admin_reject(callback: types.CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
-        await callback.answer("⚠️ Admin only!", show_alert=True)
+        await callback.answer("⚠️ አድሚኑ ብቻ ነው!", show_alert=True)
         return
 
     target_user_id = int(callback.data.split("_")[1])
@@ -612,10 +644,10 @@ async def admin_reject(callback: types.CallbackQuery):
         del admin_selections[target_user_id]
 
     await callback.message.edit_caption(caption=callback.message.caption + "\n\n❌ **[REJECTED ❌]**", reply_markup=None)
-    await callback.answer("Rejected!")
+    await callback.answer("ውድቅ ተደርጓል!")
 
     try:
-        await bot.send_message(target_user_id, "❌ **Your payment was rejected.** Please re-send valid payment proof.",
+        await bot.send_message(target_user_id, "❌ **ክፍያዎ ውድቅ ተደርጓል (Rejected)።** እባክዎ በትክክል እንደገና ይላኩ።",
                                parse_mode="Markdown")
     except Exception as e:
         print(f"Error: {e}")
