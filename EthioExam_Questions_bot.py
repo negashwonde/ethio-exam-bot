@@ -132,12 +132,8 @@ def load_all_exam_datasets():
     print("🎉 ሁሉም የ 2017 እና 2018 የጥር እና ሰኔ ጥያቄዎች ተጭነዋል!")
 
 
-# /start ትዕዛዝ (ከሰላምታ እና ከተማሪው ስም ጋር)
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    user_id = message.from_user.id
-    user_name = message.from_user.first_name
-
+# ዋናውን ሜኑ የሚያሳይ ሄፐር ፈንክሽን (ቋንቋውን በትክክል እየቀየረ የሚያሳይ)
+async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT department, lang FROM users WHERE user_id = ?", (user_id,))
@@ -209,14 +205,20 @@ async def cmd_start(message: types.Message):
             f"👇 Select an option below:"
         )
 
-    await message.answer(
-        welcome_text,
-        reply_markup=builder.as_markup(),
-        parse_mode="Markdown"
-    )
+    if edit:
+        await message_or_callback.message.edit_text(welcome_text, reply_markup=builder.as_markup(),
+                                                    parse_mode="Markdown")
+    else:
+        await message_or_callback.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# ቋንቋ መቀየሪያ ሎጂክ (Amh ወይም Eng ሲነካ)[cite: 8]
+# /start ትዕዛዝ[cite: 8]
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    await show_main_menu(message, message.from_user.id, message.from_user.first_name, edit=False)
+
+
+# ቋንቋ መቀየሪያ ሎጂክ (Amh ወይም Eng ሲነካ ወዲያውኑ ቋንቋውን ቀይሮ ሜኑውን ያሳያል)[cite: 8]
 @dp.callback_query(F.data.startswith("set_lang_"))
 async def set_language(callback: types.CallbackQuery):
     user_id = callback.from_user.id
@@ -229,7 +231,7 @@ async def set_language(callback: types.CallbackQuery):
     conn.close()
 
     await callback.answer(f"Language changed to {'አማርኛ' if new_lang == 'am' else 'English'}!")
-    await back_to_menu(callback)
+    await show_main_menu(callback, user_id, callback.from_user.first_name, edit=True)
 
 
 # ዲፓርትመንት መቀየሪያ ሜኑ
@@ -830,11 +832,7 @@ async def about_bot_handler(callback: types.CallbackQuery):
 # 14. Back Menu
 @dp.callback_query(F.data == "back_menu")
 async def back_to_menu(callback: types.CallbackQuery):
-    try:
-        await callback.message.delete()
-    except Exception:
-        pass
-    await cmd_start(callback.message)
+    await show_main_menu(callback, callback.from_user.id, callback.from_user.first_name, edit=True)
 
 
 async def main():
