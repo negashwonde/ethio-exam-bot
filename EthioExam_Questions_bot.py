@@ -479,7 +479,7 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
     # --- Telegram Mini App Button ---
     builder.row(
         types.InlineKeyboardButton(
-            text="🚀 Open Exam Mini App" if user_lang == 'en' else "🚀 ፈተናውን በ ሚኒ አፕ ክፈት",
+            text="🤖 Open Exam Mini App" if user_lang == 'en' else "🤖 ፈተናውን በ ሚኒ አፕ ክፈት",
             web_app=types.WebAppInfo(url="https://ethio-exam-bot-882d.onrender.com/webapp")
         )
     )
