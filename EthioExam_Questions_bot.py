@@ -107,9 +107,9 @@ MINI_APP_HTML = """
     <div id="freshman-view" class="card hidden">
         <h3 style="color: #38bdf8;">📚 Freshman Program (Natural Science)</h3>
         <div class="info-box">👇 የሚፈልጉትን ኮርስ ይምረጡ:</div>
-        <button class="btn" onclick="startExam('Freshman_Psych', '2026_Natural')">🧠 General Psychology</button>
-        <button class="btn" onclick="startExam('Freshman_Geog', '2026_Natural')">🌍 Geography of Ethiopia & the Horn</button>
-        <button class="btn" onclick="startExam('Freshman_Logic', '2026_Natural')">⚖️ Logic & Critical Thinking</button>
+        <button class="btn" onclick="startFreshmanExam('Psychology')">🧠 General Psychology</button>
+        <button class="btn" onclick="startFreshmanExam('Geography')">🌍 Geography of Ethiopia & the Horn</button>
+        <button class="btn" onclick="startFreshmanExam('Logic')">⚖️ Logic & Critical Thinking</button>
         <button class="btn" onclick="backToMenu()" style="background: #475569; margin-top: 15px;">🏠 ዋና ማውጫ (Main Menu)</button>
     </div>
 
@@ -172,7 +172,6 @@ MINI_APP_HTML = """
         }
 
         function showFreshmanMenu() {
-            selectedSubject = 'Freshman';
             document.getElementById('menu-view').classList.add('hidden');
             document.getElementById('freshman-view').classList.remove('hidden');
         }
@@ -185,7 +184,6 @@ MINI_APP_HTML = """
                 .then(data => {
                     if (data.locked) {
                         document.getElementById('submenu-view').classList.add('hidden');
-                        document.getElementById('freshman-view').classList.add('hidden');
                         document.getElementById('payment-view').classList.remove('hidden');
                         return;
                     }
@@ -197,6 +195,29 @@ MINI_APP_HTML = """
                     currentIndex = 0;
                     score = 0;
                     document.getElementById('submenu-view').classList.add('hidden');
+                    document.getElementById('exam-view').classList.remove('hidden');
+                    showQuestion();
+                });
+        }
+
+        function startFreshmanExam(course) {
+            selectedSubject = 'Freshman';
+            currentYear = course;
+            fetch(`/api/questions?subject=Freshman&year=${course}&user_id=${userId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.locked) {
+                        document.getElementById('freshman-view').classList.add('hidden');
+                        document.getElementById('payment-view').classList.remove('hidden');
+                        return;
+                    }
+                    questionsList = data.questions;
+                    if (questionsList.length === 0) {
+                        alert("⚠️ በዚህ ኮርስ ጥያቄዎች አልተገኙም!");
+                        return;
+                    }
+                    currentIndex = 0;
+                    score = 0;
                     document.getElementById('freshman-view').classList.add('hidden');
                     document.getElementById('exam-view').classList.remove('hidden');
                     showQuestion();
@@ -341,13 +362,12 @@ def api_answer():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    # የክፍያ ሁኔታን እንደገና ማረጋገጥ
+    pay_key = f"{subj}_{year}"
     cursor.execute("SELECT free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
                    (user_id,))
     res_user = cursor.fetchone()
     if res_user:
         free_used, pay_status, paid_depts = res_user
-        pay_key = f"{subj}_{year}"
         is_paid = pay_status == 'paid' and pay_key in paid_depts.split(",")
         if not is_paid and free_used >= 3:
             conn.close()
@@ -454,9 +474,9 @@ def load_all_exam_datasets():
         ("IT_2018_Tir_100_Questions_Distinct.csv", "IT", "2018_ጥር"),
         ("IT_2018_Sane_100_Questions_Distinct.csv", "IT", "2018_ሰኔ"),
         # Freshman Natural Science Datasets
-        ("Freshman_Psychology_Complete_Master_85Qs.csv", "Freshman_Psych", "2026_Natural"),
-        ("Geography_Ethiopia_Horn_100_Balanced_Answers.csv", "Freshman_Geog", "2026_Natural"),
-        ("Logic_and_Critical_Thinking_100_Balanced.csv", "Freshman_Logic", "2026_Natural")
+        ("Freshman_Psychology_Complete_Master_85Qs.csv", "Freshman", "Psychology"),
+        ("Geography_Ethiopia_Horn_100_Balanced_Answers.csv", "Freshman", "Geography"),
+        ("Logic_and_Critical_Thinking_100_Balanced.csv", "Freshman", "Logic")
     ]
 
     for file_name, subj, year in files_to_import:
@@ -667,12 +687,12 @@ async def it_years_menu(callback: types.CallbackQuery):
 async def freshman_menu(callback: types.CallbackQuery):
     await callback.answer()
     builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="🧠 General Psychology",
-                                           callback_data="start_exam_Freshman_Psych_2026_Natural_0_0"))
+    builder.row(
+        types.InlineKeyboardButton(text="🧠 General Psychology", callback_data="start_exam_Freshman_Psychology_0_0"))
     builder.row(types.InlineKeyboardButton(text="🌍 Geography of Ethiopia & the Horn",
-                                           callback_data="start_exam_Freshman_Geog_2026_Natural_0_0"))
-    builder.row(types.InlineKeyboardButton(text="⚖️ Logic & Critical Thinking",
-                                           callback_data="start_exam_Freshman_Logic_2026_Natural_0_0"))
+                                           callback_data="start_exam_Freshman_Geography_0_0"))
+    builder.row(
+        types.InlineKeyboardButton(text="⚖️ Logic & Critical Thinking", callback_data="start_exam_Freshman_Logic_0_0"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
     text_msg = "📚 **Freshman Program (Natural Science)**\n\n👇 የሚፈልጉትን ኮርስ ይምረጡ:"
@@ -695,20 +715,18 @@ async def start_specific_exam(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     parts = callback.data.split("_")
 
-    # Handling dynamic prefix parsing for CS/IT vs Freshman
-    if parts[2] == "Freshman":
-        subject_code = f"Freshman_{parts[3]}"  # Freshman_Psych, Freshman_Geog, Freshman_Logic
-        year_val = parts[4]
-        month_val = parts[5] if len(parts) > 5 else "Natural"
-        offset_val = int(parts[6]) if len(parts) > 6 else 0
-        current_score = int(parts[7]) if len(parts) > 7 else 0
-        full_exam_year = f"{year_val}_{month_val}"
+    if parts[1] == "Freshman":
+        subject_code = "Freshman"
+        year_val = parts[2]  # Psychology, Geography, Logic
+        offset_val = int(parts[3]) if len(parts) > 3 else 0
+        current_score = int(parts[4]) if len(parts) > 4 else 0
+        full_exam_year = year_val
     else:
-        subject_code = parts[2]
-        year_val = parts[3]
-        month_val = parts[4]
-        offset_val = int(parts[5]) if len(parts) > 5 else 0
-        current_score = int(parts[6]) if len(parts) > 6 else 0
+        subject_code = parts[1]
+        year_val = parts[2]
+        month_val = parts[3]
+        offset_val = int(parts[4]) if len(parts) > 4 else 0
+        current_score = int(parts[5]) if len(parts) > 5 else 0
         full_exam_year = f"{year_val}_{month_val}"
 
     conn = sqlite3.connect(DB_NAME)
@@ -728,7 +746,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
 
     if not is_paid_for_this and (free_used >= 3 or offset_val >= 3):
         conn.close()
-        await send_payment_prompt(callback.message, f"{subject_code}", pay_key, user_lang)
+        await send_payment_prompt(callback.message, f"{full_exam_year}", pay_key, user_lang)
         return
 
     cursor.execute(
@@ -742,14 +760,24 @@ async def start_specific_exam(callback: types.CallbackQuery):
         q_id, q_text, opt_a, opt_b, opt_c, opt_d = q
 
         builder = InlineKeyboardBuilder()
-        builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}",
-                                               callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_A"))
-        builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}",
-                                               callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_B"))
-        builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}",
-                                               callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_C"))
-        builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}",
-                                               callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_D"))
+        if subject_code == "Freshman":
+            builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}",
+                                                   callback_data=f"ans_Freshman_{full_exam_year}_{offset_val}_{q_id}_{current_score}_A"))
+            builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}",
+                                                   callback_data=f"ans_Freshman_{full_exam_year}_{offset_val}_{q_id}_{current_score}_B"))
+            builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}",
+                                                   callback_data=f"ans_Freshman_{full_exam_year}_{offset_val}_{q_id}_{current_score}_C"))
+            builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}",
+                                                   callback_data=f"ans_Freshman_{full_exam_year}_{offset_val}_{q_id}_{current_score}_D"))
+        else:
+            builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}",
+                                                   callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_A"))
+            builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}",
+                                                   callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_B"))
+            builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}",
+                                                   callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_C"))
+            builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}",
+                                                   callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_D"))
 
         bm_text = "🔖 ማስቀመጫ (Bookmark)" if user_lang == 'am' else "🔖 Bookmark"
         menu_text = "🏠 ዋና ማውጫ" if user_lang == 'am' else "🏠 Main Menu"
@@ -768,7 +796,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
             score_display = f" | Score: {current_score}/{offset_val}" if offset_val > 0 else ""
 
         await callback.message.answer(
-            f"📝 **{subject_code} Exam — Q{q_num_display}{score_display}{rem_text}:**\n\n{q_text}",
+            f"📝 **{full_exam_year} Exam — Q{q_num_display}{score_display}{rem_text}:**\n\n{q_text}",
             reply_markup=builder.as_markup(), parse_mode="Markdown"
         )
     else:
@@ -870,11 +898,11 @@ async def handle_payment_screenshot(message: types.Message):
         types.InlineKeyboardButton(text="☑️ IT - 2018 ሰኔ", callback_data=f"toggle_{user_id}_IT_2018_ሰኔ")
     )
     builder.row(
-        types.InlineKeyboardButton(text="🧠 Psych", callback_data=f"toggle_{user_id}_Freshman_Psych_2026_Natural"),
-        types.InlineKeyboardButton(text="🌍 Geog", callback_data=f"toggle_{user_id}_Freshman_Geog_2026_Natural")
+        types.InlineKeyboardButton(text="🧠 Psych", callback_data=f"toggle_{user_id}_Freshman_Psychology"),
+        types.InlineKeyboardButton(text="🌍 Geog", callback_data=f"toggle_{user_id}_Freshman_Geography")
     )
     builder.row(
-        types.InlineKeyboardButton(text="⚖️ Logic", callback_data=f"toggle_{user_id}_Freshman_Logic_2026_Natural"),
+        types.InlineKeyboardButton(text="⚖️ Logic", callback_data=f"toggle_{user_id}_Freshman_Logic"),
         types.InlineKeyboardButton(text="📖 Remedial", callback_data=f"toggle_{user_id}_Remedial_All")
     )
     builder.row(types.InlineKeyboardButton(text="🚀 የተመረጡትን አጽድቅ (Approve)", callback_data=f"finalize_app_{user_id}"))
@@ -911,7 +939,7 @@ async def admin_toggle_selection(callback: types.CallbackQuery):
     target_user_id = int(parts[1])
 
     if parts[2] == "Freshman":
-        key = f"Freshman_{parts[3]}_{parts[4]}_{parts[5]}"
+        key = f"Freshman_{parts[3]}"
     else:
         dept_code = parts[2]
         year_val = parts[3] if len(parts) > 3 else ""
@@ -1006,24 +1034,24 @@ async def check_answer(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
     parts = callback.data.split("_")
-    subject_code = parts[1]
-    if subject_code == "Freshman":
-        subject_code = f"Freshman_{parts[2]}"
-        year_val = parts[3]
-        month_val = parts[4]
-        offset_val = int(parts[5])
-        q_id = int(parts[6])
-        current_score = int(parts[7])
-        chosen_opt = parts[8]
+    if parts[1] == "Freshman":
+        subject_code = "Freshman"
+        year_val = parts[2]
+        offset_val = int(parts[3])
+        q_id = int(parts[4])
+        current_score = int(parts[5])
+        chosen_opt = parts[6]
+        full_exam_year = year_val
     else:
+        subject_code = parts[1]
         year_val = parts[2]
         month_val = parts[3]
         offset_val = int(parts[4])
         q_id = int(parts[5])
         current_score = int(parts[6])
         chosen_opt = parts[7]
+        full_exam_year = f"{year_val}_{month_val}"
 
-    full_exam_year = f"{year_val}_{month_val}"
     pay_key = f"{subject_code}_{full_exam_year}"
 
     conn = sqlite3.connect(DB_NAME)
@@ -1065,10 +1093,9 @@ async def check_answer(callback: types.CallbackQuery):
 
     next_offset = offset_val + 1
     builder = InlineKeyboardBuilder()
-    if subject_code.startswith("Freshman_"):
-        sub_prefix = f"Freshman_{subject_code.split('_')[1]}"
+    if subject_code == "Freshman":
         builder.row(types.InlineKeyboardButton(text="➡️ Next Question",
-                                               callback_data=f"start_exam_{sub_prefix}_{year_val}_{month_val}_{next_offset}_{current_score}"))
+                                               callback_data=f"start_exam_Freshman_{full_exam_year}_{next_offset}_{current_score}"))
     else:
         builder.row(types.InlineKeyboardButton(text="➡️ Next Question",
                                                callback_data=f"start_exam_{subject_code}_{year_val}_{month_val}_{next_offset}_{current_score}"))
@@ -1118,9 +1145,9 @@ async def show_bookmarks(callback: types.CallbackQuery):
         for bm in bookmarks:
             q_id, subj, year, q_text = bm
             bm_text += f"📌 ID: {q_id} | [{subj} - {year}]\n{q_text[:50]}...\n\n"
-            if subj.startswith("Freshman_"):
+            if subj == "Freshman":
                 builder.row(types.InlineKeyboardButton(text=f"🔍 View Question #{q_id}",
-                                                       callback_data=f"ans_Freshman_{subj.split('_')[1]}_{year.split('_')[0]}_{year.split('_')[1]}_0_{q_id}_0_A"))
+                                                       callback_data=f"ans_Freshman_{year}_0_{q_id}_0_A"))
             else:
                 builder.row(types.InlineKeyboardButton(text=f"🔍 View Question #{q_id}",
                                                        callback_data=f"ans_{subj}_{year.split('_')[0]}_{year.split('_')[1]}_0_{q_id}_0_A"))
@@ -1237,7 +1264,7 @@ async def main():
     flask_thread.daemon = True
     flask_thread.start()
     print("🌐 Flask Web Server & Mini App API started successfully on port 8080")
-    print("🚀 WanK Exam Bot is running live with Freshman Natural Science support!")
+    print("🚀 WanK Exam Bot is running live with fixed Freshman questions mapping!")
     await dp.start_polling(bot)
 
 
