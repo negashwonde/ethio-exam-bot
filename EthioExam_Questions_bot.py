@@ -95,7 +95,7 @@ MINI_APP_HTML = """
 
     <!-- Year & Month SubMenu View (CS ወይም IT ሲጫኑ የሚመጣ) -->
     <div id="submenu-view" class="card hidden">
-        <h3 id="submenu-title" style="color: #38bdf8;">Select exam year and month:</h3>
+        <h3 id="submenu-title" style="color: #38bdf8;">Select exam period:</h3>
         <button class="btn" onclick="startExam(selectedSubject, 'ጥር')">📅 2017/2018 — Tir</button>
         <button class="btn" onclick="startExam(selectedSubject, 'ሰኔ')">📅 2017/2018 — Sane</button>
         <button class="btn" onclick="backToMenu()" style="background: #475569; margin-top: 15px;">🏠 ዋና ማውጫ (Main Menu)</button>
@@ -399,7 +399,7 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 
-# 3. ዳታቤዙን ማቀናጀት እና የ CS, IT እና Freshman ፋይሎችን በራስ-ሰር መጫን
+# 3. ዳታቤዙን ማቀናጀት እና የ CS, IT እና Freshman ፋይሎችን በራስ-ሰር መጫን (በጣም ጠንካራ እና ጥንቃቄ የተሞላበት ጫኚ)
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -459,7 +459,7 @@ def load_all_exam_datasets():
     conn.commit()
     conn.close()
 
-    print("📂 የ CS, IT እና የፍሬሽማን ጥያቄዎችን በንጹህ ኢንኮዲንግ መጫን ጀመረ...")
+    print("📂 የ CS, IT እና የፍሬሽማን ጥያቄዎችን በጠንካራ ኢንኮዲንግ መጫን ጀመረ...")
 
     conn = sqlite3.connect(DB_NAME)
     files_to_import = [
@@ -479,24 +479,34 @@ def load_all_exam_datasets():
 
     for file_name, subj, year in files_to_import:
         if os.path.exists(file_name):
-            try:
+            success = False
+            for enc in ['utf-8', 'latin1', 'cp1252', 'iso-8859-1']:
                 try:
-                    df = pd.read_csv(file_name, encoding='utf-8')
-                except UnicodeDecodeError:
-                    df = pd.read_csv(file_name, encoding='latin1')
-
-                df['subject'] = subj
-                df['exam_year'] = year
-                df.to_sql("questions", conn, if_exists="append", index=False)
-                print(f"✅ {file_name} (Subject: {subj}, Year: {year}) በትክክል ተጫኗል!")
-            except Exception as e:
-                print(f"❌ ስህተት በ {file_name} ላይ: {e}")
+                    df = pd.read_csv(file_name, encoding=enc)
+                    df['subject'] = subj
+                    df['exam_year'] = year
+                    required_cols = ['question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer',
+                                     'explanation']
+                    for col in required_cols:
+                        if col not in df.columns:
+                            df[col] = "N/A"
+                    df_to_save = df[
+                        ['subject', 'exam_year', 'question_text', 'option_a', 'option_b', 'option_c', 'option_d',
+                         'correct_answer', 'explanation']]
+                    df_to_save.to_sql("questions", conn, if_exists="append", index=False)
+                    print(f"✅ {file_name} (Subject: {subj}, Year: {year}) በትክክል ተጫኗል!")
+                    success = True
+                    break
+                except Exception as e:
+                    continue
+            if not success:
+                print(f"❌ ስህተት በ {file_name} ላይ መጫን አልቻለም።")
         else:
             print(f"⚠️ ማስጠንቀቂያ: {file_name} ፎልደሩ ውስጥ አልተገኘም!")
 
     conn.commit()
     conn.close()
-    print("🎉 ሁሉም የ CS, IT እና የፍሬሽማን ጥያቄዎች ተጭነዋል!")
+    print("🎉 ሁሉም የፈተና ጥያቄዎች ተጭነዋል!")
 
 
 # ዋናውን ሜኑ የሚያሳይ ሄፐር ፈንክሽን
@@ -706,16 +716,12 @@ async def remedial_menu(callback: types.CallbackQuery):
                                      reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 4. ፈተና መጀመሪያ (በቦት ቻት በኩል) - Fixed Callback Parsing
+# 4. ፈተና መጀመሪያ (በቦት ቻት በኩል) - Robust Callback Parsing
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
     user_id = callback.from_user.id
     parts = callback.data.split("_")
-
-    # callback_data format:
-    # CS/IT: start_exam_CS_ጥር_0_0 -> parts[0]='start', parts[1]='exam', parts[2]='CS', parts[3]='ጥር', parts[4]='0', parts[5]='0'
-    # Freshman: start_exam_Freshman_Psychology_0_0 -> parts[0]='start', parts[1]='exam', parts[2]='Freshman', parts[3]='Psychology', parts[4]='0', parts[5]='0'
 
     if parts[2] == "Freshman":
         subject_code = "Freshman"
@@ -1018,14 +1024,13 @@ async def admin_reject(callback: types.CallbackQuery):
         print(f"Error: {e}")
 
 
-# 7. መልስ ማረጋገጫ እና Score ማስቀጠያ ሎጂክ - Fixed Callback Parsing
+# 7. መልስ ማረጋገጫ እና Score ማስቀጠያ ሎጂክ
 @dp.callback_query(F.data.startswith("ans_"))
 async def check_answer(callback: types.CallbackQuery):
     await callback.answer()
     user_id = callback.from_user.id
 
     parts = callback.data.split("_")
-    # ans_Freshman_Psychology_0_1_0_A or ans_CS_ጥር_0_1_0_A
     if parts[1] == "Freshman":
         subject_code = "Freshman"
         year_val = parts[2]
@@ -1255,7 +1260,7 @@ async def main():
     flask_thread.daemon = True
     flask_thread.start()
     print("🌐 Flask Web Server & Mini App API started successfully on port 8080")
-    print("🚀 WanK Exam Bot is running live with fully fixed Freshman callback parsing!")
+    print("🚀 WanK Exam Bot is running live with fully fixed robust DB loader and Freshman support!")
     await dp.start_polling(bot)
 
 
