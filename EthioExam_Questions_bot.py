@@ -399,7 +399,7 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 
-# 3. ዳታቤዙን ማቀናጀት እና የ CS, IT እና Freshman ፋይሎችን በራስ-ሰር መጫን (በጣም ጠንካራ እና ጥንቃቄ የተሞላበት ጫኚ)
+# 3. ዳታቤዙን ማቀናጀት እና የ CS, IT እና Freshman ፋይሎችን በትክክል መጫን (Fixed Data Loader)
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -462,7 +462,9 @@ def load_all_exam_datasets():
     print("📂 የ CS, IT እና የፍሬሽማን ጥያቄዎችን በጠንካራ ኢንኮዲንግ መጫን ጀመረ...")
 
     conn = sqlite3.connect(DB_NAME)
-    files_to_import = [
+
+    # 1. የ CS እና IT ፋይሎች
+    cs_it_files = [
         ("CS_2017_Tir_100_Unique_Final.csv", "CS", "ጥር"),
         ("CS_2017_Sane_100_Unique_Final.csv", "CS", "ሰኔ"),
         ("IT_2017_Tir_100_Unique_Final.csv", "IT", "ጥር"),
@@ -471,13 +473,9 @@ def load_all_exam_datasets():
         ("CS_2018_Sane_100_Questions_Distinct.csv", "CS", "ሰኔ"),
         ("IT_2018_Tir_100_Questions_Distinct.csv", "IT", "ጥር"),
         ("IT_2018_Sane_100_Questions_Distinct.csv", "IT", "ሰኔ"),
-        # Freshman Natural Science Datasets
-        ("Freshman_Psychology_Complete_Master_85Qs.csv", "Freshman", "Psychology"),
-        ("Geography_Ethiopia_Horn_100_Balanced_Answers.csv", "Freshman", "Geography"),
-        ("Logic_and_Critical_Thinking_100_Balanced.csv", "Freshman", "Logic")
     ]
 
-    for file_name, subj, year in files_to_import:
+    for file_name, subj, year in cs_it_files:
         if os.path.exists(file_name):
             success = False
             for enc in ['utf-8', 'latin1', 'cp1252', 'iso-8859-1']:
@@ -504,9 +502,46 @@ def load_all_exam_datasets():
         else:
             print(f"⚠️ ማስጠንቀቂያ: {file_name} ፎልደሩ ውስጥ አልተገኘም!")
 
+    # 2. የፍሬሽማን ፋይሎች (እነሱ ቀድመው ያላቸውን subject እና exam_year እንዲጠቀሙ ይደረጋል)
+    freshman_files = [
+        ("Freshman_Psychology_Complete_Master_85Qs.csv", "Freshman", "Psychology"),
+        ("Geography_Ethiopia_Horn_100_Balanced_Answers.csv", "Freshman", "Geography"),
+        ("Logic_and_Critical_Thinking_100_Balanced.csv", "Freshman", "Logic"),
+    ]
+
+    for file_name, subj, year in freshman_files:
+        if os.path.exists(file_name):
+            success = False
+            for enc in ['utf-8', 'latin1', 'cp1252', 'iso-8859-1']:
+                try:
+                    df = pd.read_csv(file_name, encoding=enc)
+                    # እዚህ ጋር የፍሬሽማን ኮርሶች subject = 'Freshman', exam_year = 'Psychology/Geography/Logic' ተብለው በግልጽ ይቀመጣሉ
+                    df['subject'] = subj
+                    df['exam_year'] = year
+
+                    required_cols = ['question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer',
+                                     'explanation']
+                    for col in required_cols:
+                        if col not in df.columns:
+                            df[col] = "N/A"
+                    df_to_save = df[
+                        ['subject', 'exam_year', 'question_text', 'option_a', 'option_b', 'option_c', 'option_d',
+                         'correct_answer', 'explanation']]
+                    df_to_save.to_sql("questions", conn, if_exists="append", index=False)
+                    print(f"✅ Freshman File {file_name} -> (Subject: {subj}, Year: {year}) በትክክል ተጫኗል!")
+                    success = True
+                    break
+                except Exception as e:
+                    print(f"❌ Error loading {file_name}: {e}")
+                    continue
+            if not success:
+                print(f"❌ ስህተት በ {file_name} ላይ መጫን አልቻለም።")
+        else:
+            print(f"⚠️ ማስጠንቀቂያ: {file_name} ፎልደሩ ውስጥ አልተገኘም!")
+
     conn.commit()
     conn.close()
-    print("🎉 ሁሉም የፈተና ጥያቄዎች ተጭነዋል!")
+    print("🎉 ሁሉም የ CS, IT እና የፍሬሽማን የፈተና ጥያቄዎች ተጭነዋል!")
 
 
 # ዋናውን ሜኑ የሚያሳይ ሄፐር ፈንክሽን
@@ -1260,7 +1295,7 @@ async def main():
     flask_thread.daemon = True
     flask_thread.start()
     print("🌐 Flask Web Server & Mini App API started successfully on port 8080")
-    print("🚀 WanK Exam Bot is running live with fully fixed robust DB loader and Freshman support!")
+    print("🚀 WanK Exam Bot is running live with fully fixed Freshman dataset loading!")
     await dp.start_polling(bot)
 
 
