@@ -14,7 +14,7 @@ app = Flask("")
 
 DB_NAME = "brand_new_exam.db"
 
-# የተሟላ የ Telegram Mini App (Frontend)
+# የተሟላ የ Telegram Mini App (Frontend ከዓመት/ወር መምረጫ እና ከ 3 ጥያቄዎች ነጻ ገደብ ጋር)
 MINI_APP_HTML = """
 <!DOCTYPE html>
 <html lang="am">
@@ -82,32 +82,24 @@ MINI_APP_HTML = """
 
     <!-- Main Menu View -->
     <div id="menu-view" class="card">
-        <div class="info-box">👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:</div>
+        <div class="info-box">👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ዲፓርትመንት ይምረጡ:</div>
         <button class="btn" onclick="showSubMenu('CS')">💻 Computer Science Exit Exam</button>
         <button class="btn" onclick="showSubMenu('IT')">📚 Information Technology Exit Exam</button>
-        <button class="btn" onclick="showFreshmanMenu()">📚 Freshman Program (Natural)</button>
+        <button class="btn" onclick="alert('📚 Freshman program exams and materials will be updated soon!')">📚 Freshman Program</button>
         <button class="btn" onclick="alert('📖 Remedial program exams and materials will be updated soon!')">📖 Remedial Program</button>
-        <button class="btn" onclick="alert('📊 የእኔ ውጤት ለማየት ዋናውን የቴሌግራም ቦት ይጠቀሙ።')">📊 የእኔ ውጤት (My Progress)</button>
-        <button class="btn" onclick="alert('📄 ሰነዶች ማቴሪያሎች በቦቱ ውስጥ በሚገኘው ሊንክ ማውረድ ይችላሉ።')">📄 ሰነዶች (ማቴሪያሎች)</button>
+        <button class="btn" onclick="alert('📊 የርስዎን ውጤት ለማየት ዋናውን የቴሌግራም ቦት ይጠቀሙ።')">📊 የእኔ ውጤት (My Progress)</button>
+        <button class="btn" onclick="alert('📄 የሰነዶች ማቴሪያሎች በቦቱ ውስጥ በሚገኘው ሊንክ ማውረድ ይችላሉ።')">📄 ሰነዶች (ማቴሪያሎች)</button>
         <button class="btn" onclick="alert('ℹ️ WankExamBot ለሁሉም የዩኒቨርሲቲ ተማሪዎች የተዘጋጀ የዝግጅት ረዳት ነው።')">ℹ️ ስለ ቦቱ (About Bot)</button>
         <button class="btn" onclick="alert('🎧 እርዳታ ለማግኘት በስልክ ቁጥር 0919245693 ወይም @neguRoha ያግኙን።')">🎧 እርዳታ እና ድጋፍ (Support)</button>
     </div>
 
     <!-- Year & Month SubMenu View (CS ወይም IT ሲጫኑ የሚመጣ) -->
     <div id="submenu-view" class="card hidden">
-        <h3 id="submenu-title" style="color: #38bdf8;">Select exam period:</h3>
-        <button class="btn" onclick="startExam(selectedSubject, 'ጥር')">📅 2017/2018 — Tir</button>
-        <button class="btn" onclick="startExam(selectedSubject, 'ሰኔ')">📅 2017/2018 — Sane</button>
-        <button class="btn" onclick="backToMenu()" style="background: #475569; margin-top: 15px;">🏠 ዋና ማውጫ (Main Menu)</button>
-    </div>
-
-    <!-- Freshman Courses Menu View -->
-    <div id="freshman-view" class="card hidden">
-        <h3 style="color: #38bdf8;">📚 Freshman Program (Natural Science)</h3>
-        <div class="info-box">👇 የሚፈልጉትን ኮርስ ይምረጡ:</div>
-        <button class="btn" onclick="startFreshmanExam('Psychology')">🧠 General Psychology</button>
-        <button class="btn" onclick="startFreshmanExam('Geography')">🌍 Geography of Ethiopia & the Horn</button>
-        <button class="btn" onclick="startFreshmanExam('Logic')">⚖️ Logic & Critical Thinking</button>
+        <h3 id="submenu-title" style="color: #38bdf8;">Select exam year and month:</h3>
+        <button class="btn" onclick="startExam(selectedSubject, '2017_ጥር')">📅 2017 ዓ.ም — Tir</button>
+        <button class="btn" onclick="startExam(selectedSubject, '2017_ሰኔ')">📅 2017 ዓ.ም — Sane</button>
+        <button class="btn" onclick="startExam(selectedSubject, '2018_ጥር')">📅 2018 ዓ.ም — Tir</button>
+        <button class="btn" onclick="startExam(selectedSubject, '2018_ሰኔ')">📅 2018 ዓ.ም — Sane</button>
         <button class="btn" onclick="backToMenu()" style="background: #475569; margin-top: 15px;">🏠 ዋና ማውጫ (Main Menu)</button>
     </div>
 
@@ -165,19 +157,13 @@ MINI_APP_HTML = """
         function showSubMenu(subj) {
             selectedSubject = subj;
             document.getElementById('menu-view').classList.add('hidden');
-            document.getElementById('submenu-title').innerText = `${subj === 'CS' ? 'Computer Science' : 'Information Technology'} Exit Exam\nSelect exam period:`;
+            document.getElementById('submenu-title').innerText = `${subj === 'CS' ? 'Computer Science' : 'Information Technology'} Exit Exam\nSelect exam year and month:`;
             document.getElementById('submenu-view').classList.remove('hidden');
         }
 
-        function showFreshmanMenu() {
-            document.getElementById('menu-view').classList.add('hidden');
-            document.getElementById('freshman-view').classList.remove('hidden');
-        }
-
-        function startExam(subj, period) {
-            selectedSubject = subj;
-            currentYear = period;
-            fetch(`/api/questions?subject=${subj}&year=${period}&user_id=${userId}`)
+        function startExam(subj, year) {
+            currentYear = year;
+            fetch(`/api/questions?subject=${subj}&year=${year}&user_id=${userId}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.locked) {
@@ -193,30 +179,6 @@ MINI_APP_HTML = """
                     currentIndex = 0;
                     score = 0;
                     document.getElementById('submenu-view').classList.add('hidden');
-                    document.getElementById('exam-view').classList.remove('hidden');
-                    showQuestion();
-                });
-        }
-
-        function startFreshmanExam(course) {
-            selectedSubject = 'Freshman';
-            currentYear = course;
-            fetch(`/api/questions?subject=Freshman&year=${course}&user_id=${userId}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.locked) {
-                        document.getElementById('freshman-view').classList.add('hidden');
-                        document.getElementById('payment-view').classList.remove('hidden');
-                        return;
-                    }
-                    questionsList = data.questions;
-                    if (questionsList.length === 0) {
-                        alert("⚠️ በዚህ ኮርስ ጥያቄዎች አልተገኙም!");
-                        return;
-                    }
-                    currentIndex = 0;
-                    score = 0;
-                    document.getElementById('freshman-view').classList.add('hidden');
                     document.getElementById('exam-view').classList.remove('hidden');
                     showQuestion();
                 });
@@ -289,7 +251,6 @@ MINI_APP_HTML = """
             document.getElementById('payment-view').classList.add('hidden');
             document.getElementById('result-view').classList.add('hidden');
             document.getElementById('submenu-view').classList.add('hidden');
-            document.getElementById('freshman-view').classList.add('hidden');
             document.getElementById('menu-view').classList.remove('hidden');
         }
     </script>
@@ -300,7 +261,7 @@ MINI_APP_HTML = """
 
 @app.route("/")
 def home():
-    return "🤖 WanK CS, IT & Freshman Exam Bot & Mini App API is running live!"
+    return "🤖 WanK CS & IT Exit Exam Bot & Mini App API is running live!"
 
 
 @app.route("/webapp")
@@ -312,7 +273,7 @@ def webapp():
 @app.route("/api/questions")
 def api_questions():
     subj = request.args.get("subject", "CS")
-    year = request.args.get("year", "ጥር")
+    year = request.args.get("year", "2017_ጥር")
     user_id = int(request.args.get("user_id", 0))
 
     conn = sqlite3.connect(DB_NAME)
@@ -360,12 +321,13 @@ def api_answer():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    pay_key = f"{subj}_{year}"
+    # የክፍያ ሁኔታን እንደገና ማረጋገጥ
     cursor.execute("SELECT free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
                    (user_id,))
     res_user = cursor.fetchone()
     if res_user:
         free_used, pay_status, paid_depts = res_user
+        pay_key = f"{subj}_{year}"
         is_paid = pay_status == 'paid' and pay_key in paid_depts.split(",")
         if not is_paid and free_used >= 3:
             conn.close()
@@ -399,7 +361,7 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 
-# 3. ዳታቤዙን ማቀናጀት እና የ CS, IT እና Freshman ፋይሎችን በትክክል መጫን (Fixed Data Loader)
+# 3. ዳታቤዙን ማቀናጀት እና የ 2017 እና 2018 ፋይሎችን በራስ-ሰር መጫን
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -459,89 +421,40 @@ def load_all_exam_datasets():
     conn.commit()
     conn.close()
 
-    print("📂 የ CS, IT እና የፍሬሽማን ጥያቄዎችን በጠንካራ ኢንኮዲንግ መጫን ጀመረ...")
+    print("📂 የ 2017 እና 2018 ዓ.ም የጥር እና ሰኔ ጥያቄዎችን በንጹህ ኢንኮዲንግ መጫን ጀመረ...")
 
     conn = sqlite3.connect(DB_NAME)
-
-    # 1. የ CS እና IT ፋይሎች
-    cs_it_files = [
-        ("CS_2017_Tir_100_Unique_Final.csv", "CS", "ጥር"),
-        ("CS_2017_Sane_100_Unique_Final.csv", "CS", "ሰኔ"),
-        ("IT_2017_Tir_100_Unique_Final.csv", "IT", "ጥር"),
-        ("IT_2017_Sane_100_Unique_Final.csv", "IT", "ሰኔ"),
-        ("CS_2018_Tir_100_Questions_Distinct.csv", "CS", "ጥር"),
-        ("CS_2018_Sane_100_Questions_Distinct.csv", "CS", "ሰኔ"),
-        ("IT_2018_Tir_100_Questions_Distinct.csv", "IT", "ጥር"),
-        ("IT_2018_Sane_100_Questions_Distinct.csv", "IT", "ሰኔ"),
+    files_to_import = [
+        ("CS_2017_Tir_100_Unique_Final.csv", "CS", "2017_ጥር"),
+        ("CS_2017_Sane_100_Unique_Final.csv", "CS", "2017_ሰኔ"),
+        ("IT_2017_Tir_100_Unique_Final.csv", "IT", "2017_ጥር"),
+        ("IT_2017_Sane_100_Unique_Final.csv", "IT", "2017_ሰኔ"),
+        ("CS_2018_Tir_100_Questions_Distinct.csv", "CS", "2018_ጥር"),
+        ("CS_2018_Sane_100_Questions_Distinct.csv", "CS", "2018_ሰኔ"),
+        ("IT_2018_Tir_100_Questions_Distinct.csv", "IT", "2018_ጥር"),
+        ("IT_2018_Sane_100_Questions_Distinct.csv", "IT", "2018_ሰኔ")
     ]
 
-    for file_name, subj, year in cs_it_files:
+    for file_name, subj, year in files_to_import:
         if os.path.exists(file_name):
-            success = False
-            for enc in ['utf-8', 'latin1', 'cp1252', 'iso-8859-1']:
+            try:
                 try:
-                    df = pd.read_csv(file_name, encoding=enc)
-                    df['subject'] = subj
-                    df['exam_year'] = year
-                    required_cols = ['question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer',
-                                     'explanation']
-                    for col in required_cols:
-                        if col not in df.columns:
-                            df[col] = "N/A"
-                    df_to_save = df[
-                        ['subject', 'exam_year', 'question_text', 'option_a', 'option_b', 'option_c', 'option_d',
-                         'correct_answer', 'explanation']]
-                    df_to_save.to_sql("questions", conn, if_exists="append", index=False)
-                    print(f"✅ {file_name} (Subject: {subj}, Year: {year}) በትክክል ተጫኗል!")
-                    success = True
-                    break
-                except Exception as e:
-                    continue
-            if not success:
-                print(f"❌ ስህተት በ {file_name} ላይ መጫን አልቻለም።")
-        else:
-            print(f"⚠️ ማስጠንቀቂያ: {file_name} ፎልደሩ ውስጥ አልተገኘም!")
+                    df = pd.read_csv(file_name, encoding='utf-8')
+                except UnicodeDecodeError:
+                    df = pd.read_csv(file_name, encoding='latin1')
 
-    # 2. የፍሬሽማን ፋይሎች (እነሱ ቀድመው ያላቸውን subject እና exam_year እንዲጠቀሙ ይደረጋል)
-    freshman_files = [
-        ("Freshman_Psychology_Complete_Master_85Qs.csv", "Freshman", "Psychology"),
-        ("Geography_Ethiopia_Horn_100_Balanced_Answers.csv", "Freshman", "Geography"),
-        ("Logic_and_Critical_Thinking_100_Balanced.csv", "Freshman", "Logic"),
-    ]
-
-    for file_name, subj, year in freshman_files:
-        if os.path.exists(file_name):
-            success = False
-            for enc in ['utf-8', 'latin1', 'cp1252', 'iso-8859-1']:
-                try:
-                    df = pd.read_csv(file_name, encoding=enc)
-                    # እዚህ ጋር የፍሬሽማን ኮርሶች subject = 'Freshman', exam_year = 'Psychology/Geography/Logic' ተብለው በግልጽ ይቀመጣሉ
-                    df['subject'] = subj
-                    df['exam_year'] = year
-
-                    required_cols = ['question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer',
-                                     'explanation']
-                    for col in required_cols:
-                        if col not in df.columns:
-                            df[col] = "N/A"
-                    df_to_save = df[
-                        ['subject', 'exam_year', 'question_text', 'option_a', 'option_b', 'option_c', 'option_d',
-                         'correct_answer', 'explanation']]
-                    df_to_save.to_sql("questions", conn, if_exists="append", index=False)
-                    print(f"✅ Freshman File {file_name} -> (Subject: {subj}, Year: {year}) በትክክል ተጫኗል!")
-                    success = True
-                    break
-                except Exception as e:
-                    print(f"❌ Error loading {file_name}: {e}")
-                    continue
-            if not success:
-                print(f"❌ ስህተት በ {file_name} ላይ መጫን አልቻለም።")
+                df['subject'] = subj
+                df['exam_year'] = year
+                df.to_sql("questions", conn, if_exists="append", index=False)
+                print(f"✅ {file_name} (Subject: {subj}, Year: {year}) በትክክል ተጫኗል!")
+            except Exception as e:
+                print(f"❌ ስህተት በ {file_name} ላይ: {e}")
         else:
             print(f"⚠️ ማስጠንቀቂያ: {file_name} ፎልደሩ ውስጥ አልተገኘም!")
 
     conn.commit()
     conn.close()
-    print("🎉 ሁሉም የ CS, IT እና የፍሬሽማን የፈተና ጥያቄዎች ተጭነዋል!")
+    print("🎉 ሁሉም የ 2017 እና 2018 የጥር እና ሰኔ ጥያቄዎች ተጭነዋል!")
 
 
 # ዋናውን ሜኑ የሚያሳይ ሄፐር ፈንክሽን
@@ -578,7 +491,7 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
                                    callback_data="dept_it_menu")
     )
     builder.row(
-        types.InlineKeyboardButton(text="📚 Freshman (Natural) >" if user_lang == 'en' else "📚 ፍሬሽማን (ናቹራል) >",
+        types.InlineKeyboardButton(text="📚 Freshman >" if user_lang == 'en' else "📚 ፍሬሽማን >",
                                    callback_data="dept_freshman_menu"),
         types.InlineKeyboardButton(text="📖 Remedial >" if user_lang == 'en' else "📖 ሬሚዲያል >",
                                    callback_data="dept_remedial_menu")
@@ -612,7 +525,7 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
         welcome_text = (
             f"👋 **ሰላም {user_name}!**\n\n"
             f"🎓 **ወደ Wank Exam ዝግጅት ቦት እንኳን ደህና መጡ።**\n"
-            f"ለኮምፒውተር ሳይንስ (CS)፣ ለአይቲ (IT) እና ለፍሬሽማን (Freshman) የፈተና ጥያቄዎች እና ማብራሪያዎች እዚህ ያገኛሉ።\n\n"
+            f"ለኮምፒውተር ሳይንስ (CS) እና ለአይቲ (IT) የኤክዚት ፈተና ጥያቄዎች እና ማብራሪያዎች እዚህ ያገኛሉ።\n\n"
             f"💡 *ማሳሰቢያ:* የመጀመሪያዎቹ **3 ጥያቄዎች በነጻ** መፈተን ይችላሉ! ከዛ በኋላ ሙሉ ፈተናውን ለመክፈት ክፍያ ይጠየቃል።\n\n"
             f"👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:"
         )
@@ -620,7 +533,7 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
         welcome_text = (
             f"👋 **Hello {user_name}!**\n\n"
             f"🎓 **Welcome to Wank Exam Preparation Bot.**\n"
-            f"Find Computer Science (CS), IT, and Freshman exam questions and explanations here.\n\n"
+            f"Find Computer Science (CS) and IT exit exam questions and explanations here.\n\n"
             f"💡 *Note:* The first **3 questions are free**! Afterwards, payment is required to unlock the full exam.\n\n"
             f"👇 Select an option below:"
         )
@@ -632,13 +545,13 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
         await message_or_callback.answer(welcome_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# /start ትዕዛዝ
+# /start ትዕዛዝ[cite: 8]
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await show_main_menu(message, message.from_user.id, message.from_user.first_name, edit=False)
 
 
-# ቋንቋ መቀየሪያ ሎጂክ
+# ቋንቋ መቀየሪያ ሎጂክ[cite: 8]
 @dp.callback_query(F.data.startswith("set_lang_"))
 async def set_language(callback: types.CallbackQuery):
     user_id = callback.from_user.id
@@ -664,7 +577,7 @@ async def change_dept_menu(callback: types.CallbackQuery):
         types.InlineKeyboardButton(text="📡 Information Technology (IT)", callback_data="set_dept_IT")
     )
     builder.row(
-        types.InlineKeyboardButton(text="📚 Freshman (Natural)", callback_data="set_dept_Freshman"),
+        types.InlineKeyboardButton(text="📚 Freshman", callback_data="set_dept_Freshman"),
         types.InlineKeyboardButton(text="📖 Remedial", callback_data="set_dept_Remedial")
     )
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
@@ -691,18 +604,32 @@ async def set_department_action(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "dept_cs_menu")
 async def cs_years_menu(callback: types.CallbackQuery):
     await callback.answer()
+    user_id = callback.from_user.id
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT department FROM users WHERE user_id = ?", (user_id,))
+    res = cursor.fetchone()
+    conn.close()
+
+    user_dept = res[0] if res else "CS"
+    if user_id != ADMIN_ID and user_dept != "CS":
+        await callback.answer(f"⚠️ Warning: Your registered department is '{user_dept}'. You cannot access CS exams!",
+                              show_alert=True)
+        return
+
     builder = InlineKeyboardBuilder()
     builder.row(
-        types.InlineKeyboardButton(text="📅 2017 ዓ.ም — Tir", callback_data="start_exam_CS_ጥር_0_0"),
-        types.InlineKeyboardButton(text="📅 2017 ዓ.ም — Sane", callback_data="start_exam_CS_ሰኔ_0_0")
+        types.InlineKeyboardButton(text="📅 2017 ዓ.ም — Tir", callback_data="start_exam_CS_2017_ጥር_0_0"),
+        types.InlineKeyboardButton(text="📅 2017 ዓ.ም — Sane", callback_data="start_exam_CS_2017_ሰኔ_0_0")
     )
     builder.row(
-        types.InlineKeyboardButton(text="📅 2018 ዓ.ም — Tir", callback_data="start_exam_CS_ጥር_0_0"),
-        types.InlineKeyboardButton(text="📅 2018 ዓ.ም — Sane", callback_data="start_exam_CS_ሰኔ_0_0")
+        types.InlineKeyboardButton(text="📅 2018 ዓ.ም — Tir", callback_data="start_exam_CS_2018_ጥር_0_0"),
+        types.InlineKeyboardButton(text="📅 2018 ዓ.ም — Sane", callback_data="start_exam_CS_2018_ሰኔ_0_0")
     )
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
-    text_msg = "💻 **Computer Science Exit Exam**\n\nSelect exam period:"
+    text_msg = "💻 **Computer Science Exit Exam**\n\nSelect exam year and month:"
     await callback.message.edit_text(text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
@@ -710,36 +637,43 @@ async def cs_years_menu(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "dept_it_menu")
 async def it_years_menu(callback: types.CallbackQuery):
     await callback.answer()
+    user_id = callback.from_user.id
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT department FROM users WHERE user_id = ?", (user_id,))
+    res = cursor.fetchone()
+    conn.close()
+
+    user_dept = res[0] if res else "IT"
+    if user_id != ADMIN_ID and user_dept != "IT":
+        await callback.answer(f"⚠️ Warning: Your registered department is '{user_dept}'. You cannot access IT exams!",
+                              show_alert=True)
+        return
+
     builder = InlineKeyboardBuilder()
     builder.row(
-        types.InlineKeyboardButton(text="📅 2017 ዓ.ም — Tir", callback_data="start_exam_IT_ጥር_0_0"),
-        types.InlineKeyboardButton(text="📅 2017 ዓ.ም — Sane", callback_data="start_exam_IT_ሰኔ_0_0")
+        types.InlineKeyboardButton(text="📅 2017 ዓ.ም — Tir", callback_data="start_exam_IT_2017_ጥር_0_0"),
+        types.InlineKeyboardButton(text="📅 2017 ዓ.ም — Sane", callback_data="start_exam_IT_2017_ሰኔ_0_0")
     )
     builder.row(
-        types.InlineKeyboardButton(text="📅 2018 ዓ.ም — Tir", callback_data="start_exam_IT_ጥር_0_0"),
-        types.InlineKeyboardButton(text="📅 2018 ዓ.ም — Sane", callback_data="start_exam_IT_ሰኔ_0_0")
+        types.InlineKeyboardButton(text="📅 2018 ዓ.ም — Tir", callback_data="start_exam_IT_2018_ጥር_0_0"),
+        types.InlineKeyboardButton(text="📅 2018 ዓ.ም — Sane", callback_data="start_exam_IT_2018_ሰኔ_0_0")
     )
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
-    text_msg = "📡 **Information Technology (IT) Exit Exam**\n\nSelect exam period:"
+    text_msg = "📡 **Information Technology (IT) Exit Exam**\n\nSelect exam year and month:"
     await callback.message.edit_text(text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 3. Freshman Program (Natural Science) Courses Menu
+# 3. Freshman & Remedial Menu Handlers
 @dp.callback_query(F.data == "dept_freshman_menu")
 async def freshman_menu(callback: types.CallbackQuery):
     await callback.answer()
     builder = InlineKeyboardBuilder()
-    builder.row(
-        types.InlineKeyboardButton(text="🧠 General Psychology", callback_data="start_exam_Freshman_Psychology_0_0"))
-    builder.row(types.InlineKeyboardButton(text="🌍 Geography of Ethiopia & the Horn",
-                                           callback_data="start_exam_Freshman_Geography_0_0"))
-    builder.row(
-        types.InlineKeyboardButton(text="⚖️ Logic & Critical Thinking", callback_data="start_exam_Freshman_Logic_0_0"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
-
-    text_msg = "📚 **Freshman Program (Natural Science)**\n\n👇 የሚፈልጉትን ኮርስ ይምረጡ:"
-    await callback.message.edit_text(text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
+    await callback.message.edit_text("📚 **Freshman Program**\n\nMaterials and exams will be updated soon!",
+                                     reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
 @dp.callback_query(F.data == "dept_remedial_menu")
@@ -751,25 +685,19 @@ async def remedial_menu(callback: types.CallbackQuery):
                                      reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 4. ፈተና መጀመሪያ (በቦት ቻት በኩል) - Robust Callback Parsing
+# 4. ፈተና መጀመሪያ (በቦት ቻት በኩል)[cite: 8]
 @dp.callback_query(F.data.startswith("start_exam_"))
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
     user_id = callback.from_user.id
     parts = callback.data.split("_")
+    subject_code = parts[2]
+    year_val = parts[3]
+    month_val = parts[4]
+    offset_val = int(parts[5]) if len(parts) > 5 else 0
+    current_score = int(parts[6]) if len(parts) > 6 else 0
 
-    if parts[2] == "Freshman":
-        subject_code = "Freshman"
-        year_val = parts[3]  # Psychology, Geography, Logic
-        offset_val = int(parts[4]) if len(parts) > 4 else 0
-        current_score = int(parts[5]) if len(parts) > 5 else 0
-        full_exam_year = year_val
-    else:
-        subject_code = parts[2]
-        year_val = parts[3]  # ጥር or ሰኔ
-        offset_val = int(parts[4]) if len(parts) > 4 else 0
-        current_score = int(parts[5]) if len(parts) > 5 else 0
-        full_exam_year = year_val
+    full_exam_year = f"{year_val}_{month_val}"
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -778,17 +706,24 @@ async def start_specific_exam(callback: types.CallbackQuery):
         (user_id,))
     user_data = cursor.fetchone()
 
+    user_dept = user_data[0] if user_data else "CS"
     user_lang = user_data[1] if user_data else "am"
     free_used = user_data[2] if user_data else 0
     pay_status = user_data[3] if user_data else 'free'
     paid_depts = user_data[4] if user_data else ''
+
+    if user_id != ADMIN_ID and user_dept != subject_code:
+        conn.close()
+        err_msg = f"⚠️ ይቅርታ! እርስዎ የተመዘገቡት በ **{user_dept}** ስለሆነ የ **{subject_code}** ፈተና መፈተን አይችሉም።" if user_lang == 'am' else f"⚠️ Sorry! You are registered in **{user_dept}**, so you cannot take **{subject_code}** exams."
+        await callback.message.answer(err_msg)
+        return
 
     pay_key = f"{subject_code}_{full_exam_year}"
     is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
     if not is_paid_for_this and (free_used >= 3 or offset_val >= 3):
         conn.close()
-        await send_payment_prompt(callback.message, f"{full_exam_year}", pay_key, user_lang)
+        await send_payment_prompt(callback.message, f"{subject_code} ({year_val} {month_val})", pay_key, user_lang)
         return
 
     cursor.execute(
@@ -802,24 +737,14 @@ async def start_specific_exam(callback: types.CallbackQuery):
         q_id, q_text, opt_a, opt_b, opt_c, opt_d = q
 
         builder = InlineKeyboardBuilder()
-        if subject_code == "Freshman":
-            builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}",
-                                                   callback_data=f"ans_Freshman_{full_exam_year}_{offset_val}_{q_id}_{current_score}_A"))
-            builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}",
-                                                   callback_data=f"ans_Freshman_{full_exam_year}_{offset_val}_{q_id}_{current_score}_B"))
-            builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}",
-                                                   callback_data=f"ans_Freshman_{full_exam_year}_{offset_val}_{q_id}_{current_score}_C"))
-            builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}",
-                                                   callback_data=f"ans_Freshman_{full_exam_year}_{offset_val}_{q_id}_{current_score}_D"))
-        else:
-            builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}",
-                                                   callback_data=f"ans_{subject_code}_{year_val}_{offset_val}_{q_id}_{current_score}_A"))
-            builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}",
-                                                   callback_data=f"ans_{subject_code}_{year_val}_{offset_val}_{q_id}_{current_score}_B"))
-            builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}",
-                                                   callback_data=f"ans_{subject_code}_{year_val}_{offset_val}_{q_id}_{current_score}_C"))
-            builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}",
-                                                   callback_data=f"ans_{subject_code}_{year_val}_{offset_val}_{q_id}_{current_score}_D"))
+        builder.row(types.InlineKeyboardButton(text=f"A) {opt_a}",
+                                               callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_A"))
+        builder.row(types.InlineKeyboardButton(text=f"B) {opt_b}",
+                                               callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_B"))
+        builder.row(types.InlineKeyboardButton(text=f"C) {opt_c}",
+                                               callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_C"))
+        builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}",
+                                               callback_data=f"ans_{subject_code}_{year_val}_{month_val}_{offset_val}_{q_id}_{current_score}_D"))
 
         bm_text = "🔖 ማስቀመጫ (Bookmark)" if user_lang == 'am' else "🔖 Bookmark"
         menu_text = "🏠 ዋና ማውጫ" if user_lang == 'am' else "🏠 Main Menu"
@@ -838,7 +763,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
             score_display = f" | Score: {current_score}/{offset_val}" if offset_val > 0 else ""
 
         await callback.message.answer(
-            f"📝 **{full_exam_year} Exam — Q{q_num_display}{score_display}{rem_text}:**\n\n{q_text}",
+            f"📝 **{subject_code} ({year_val} {month_val}) Exit Exam — Q{q_num_display}{score_display}{rem_text}:**\n\n{q_text}",
             reply_markup=builder.as_markup(), parse_mode="Markdown"
         )
     else:
@@ -864,7 +789,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
         await callback.message.answer(summary_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 5. የክፍያ ጥያቄ ማሳያ
+# 5. የክፍያ ጥያቄ ማሳያ[cite: 8]
 async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: str, lang: str):
     if lang == 'am':
         pay_text = (
@@ -889,7 +814,7 @@ async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: s
             f"📸 Send your payment screenshot to this bot after paying!"
         )
         btn_screenshot = "📤 Send Screenshot (Admin)"
-        btn_menu = "Main Menu"
+        btn_menu = "🏠 Main Menu"
 
     builder = InlineKeyboardBuilder()
     builder.row(types.InlineKeyboardButton(text=btn_screenshot, callback_data=f"upload_screenshot_info_{pay_key}"))
@@ -901,7 +826,7 @@ async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: s
 async def screenshot_info(callback: types.CallbackQuery):
     await callback.answer()
     await callback.message.answer(
-        "📸 እባክዎ የክፍያ ማረጋገጫ (Screenshot) ምስል በቀጥታ በዚህ ቻት ውስጥ ፎቶውን ይላኩ። አድሚኑ ወዲያውኑ አረጋግጦ ይከፍትልዎታል!")
+        "📸 እባክዎ የክፍያ ማረጋገጫ (Screenshot) ምስል በቀጥታ በዚህ ቻት ውስጥ ፎቶውን ይላኩ። አድሚኑ ወዲያውኑ አረጋግጦ ይከፍትልዎታል! / Please send your payment screenshot photo directly in this chat.")
 
 
 # 6. ተማሪው ስክሪንሾት ሲልክ
@@ -924,19 +849,23 @@ async def handle_payment_screenshot(message: types.Message):
 
     builder = InlineKeyboardBuilder()
     builder.row(
-        types.InlineKeyboardButton(text="☑️ CS - ጥር", callback_data=f"toggle_{user_id}_CS_ጥር"),
-        types.InlineKeyboardButton(text="☑️ CS - ሰኔ", callback_data=f"toggle_{user_id}_CS_ሰኔ")
+        types.InlineKeyboardButton(text="☑️ CS - 2017 ጥር", callback_data=f"toggle_{user_id}_CS_2017_ጥር"),
+        types.InlineKeyboardButton(text="☑️ CS - 2017 ሰኔ", callback_data=f"toggle_{user_id}_CS_2017_ሰኔ")
     )
     builder.row(
-        types.InlineKeyboardButton(text="☑️ IT - ጥር", callback_data=f"toggle_{user_id}_IT_ጥር"),
-        types.InlineKeyboardButton(text="☑️ IT - ሰኔ", callback_data=f"toggle_{user_id}_IT_ሰኔ")
+        types.InlineKeyboardButton(text="☑️ CS - 2018 ጥር", callback_data=f"toggle_{user_id}_CS_2018_ጥር"),
+        types.InlineKeyboardButton(text="☑️ CS - 2018 ሰኔ", callback_data=f"toggle_{user_id}_CS_2018_ሰኔ")
     )
     builder.row(
-        types.InlineKeyboardButton(text="🧠 Psych", callback_data=f"toggle_{user_id}_Freshman_Psychology"),
-        types.InlineKeyboardButton(text="🌍 Geog", callback_data=f"toggle_{user_id}_Freshman_Geography")
+        types.InlineKeyboardButton(text="☑️ IT - 2017 ጥር", callback_data=f"toggle_{user_id}_IT_2017_ጥር"),
+        types.InlineKeyboardButton(text="☑️ IT - 2017 ሰኔ", callback_data=f"toggle_{user_id}_IT_2017_ሰኔ")
     )
     builder.row(
-        types.InlineKeyboardButton(text="⚖️ Logic", callback_data=f"toggle_{user_id}_Freshman_Logic"),
+        types.InlineKeyboardButton(text="☑️ IT - 2018 ጥር", callback_data=f"toggle_{user_id}_IT_2018_ጥር"),
+        types.InlineKeyboardButton(text="☑️ IT - 2018 ሰኔ", callback_data=f"toggle_{user_id}_IT_2018_ሰኔ")
+    )
+    builder.row(
+        types.InlineKeyboardButton(text="📚 Freshman", callback_data=f"toggle_{user_id}_Freshman_All"),
         types.InlineKeyboardButton(text="📖 Remedial", callback_data=f"toggle_{user_id}_Remedial_All")
     )
     builder.row(types.InlineKeyboardButton(text="🚀 የተመረጡትን አጽድቅ (Approve)", callback_data=f"finalize_app_{user_id}"))
@@ -945,9 +874,10 @@ async def handle_payment_screenshot(message: types.Message):
     admin_caption = (
         f"🔔 **አዲስ የክፍያ ማረጋገጫ መጥቷል!**\n\n"
         f"👤 የተማሪ ስም: {user_name}\n"
-        f"🎯 **የተማሪው ዲፓርትመንት: {student_dept}**\n"
+        f"🎯 **የተማሪው ዲፓርትመንት: {student_dept}** 📌 (እባክዎ ይህንን በማየት ትክክለኛውን ፈተና ያጽድቁ!)\n"
         f"🔗 ዩዘርናም: @{username if username else 'N/A'}\n"
-        f"🆔 User ID: `{user_id}`"
+        f"🆔 User ID: `{user_id}`\n\n"
+        f"📌 *የሚከፈተውን ፈተና ከላይ በመንካት ከዛ 'የተመረጡትን አጽድቅ' የሚለውን ይጫኑ።*"
     )
 
     await bot.send_photo(
@@ -970,13 +900,11 @@ async def admin_toggle_selection(callback: types.CallbackQuery):
 
     parts = callback.data.split("_")
     target_user_id = int(parts[1])
+    dept_code = parts[2]
+    year_val = parts[3] if len(parts) > 3 else ""
+    period = parts[4] if len(parts) > 4 else ""
 
-    if parts[2] == "Freshman":
-        key = f"Freshman_{parts[3]}"
-    else:
-        dept_code = parts[2]
-        period = parts[3] if len(parts) > 3 else ""
-        key = f"{dept_code}_{period}"
+    key = f"{dept_code}_{year_val}_{period}" if period else f"{dept_code}"
 
     if target_user_id not in admin_selections:
         admin_selections[target_user_id] = set()
@@ -1066,23 +994,15 @@ async def check_answer(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
     parts = callback.data.split("_")
-    if parts[1] == "Freshman":
-        subject_code = "Freshman"
-        year_val = parts[2]
-        offset_val = int(parts[3])
-        q_id = int(parts[4])
-        current_score = int(parts[5])
-        chosen_opt = parts[6]
-        full_exam_year = year_val
-    else:
-        subject_code = parts[1]
-        year_val = parts[2]
-        offset_val = int(parts[3])
-        q_id = int(parts[4])
-        current_score = int(parts[5])
-        chosen_opt = parts[6]
-        full_exam_year = year_val
+    subject_code = parts[1]
+    year_val = parts[2]
+    month_val = parts[3]
+    offset_val = int(parts[4])
+    q_id = int(parts[5])
+    current_score = int(parts[6])
+    chosen_opt = parts[7]
 
+    full_exam_year = f"{year_val}_{month_val}"
     pay_key = f"{subject_code}_{full_exam_year}"
 
     conn = sqlite3.connect(DB_NAME)
@@ -1124,12 +1044,8 @@ async def check_answer(callback: types.CallbackQuery):
 
     next_offset = offset_val + 1
     builder = InlineKeyboardBuilder()
-    if subject_code == "Freshman":
-        builder.row(types.InlineKeyboardButton(text="➡️ Next Question",
-                                               callback_data=f"start_exam_Freshman_{full_exam_year}_{next_offset}_{current_score}"))
-    else:
-        builder.row(types.InlineKeyboardButton(text="➡️ Next Question",
-                                               callback_data=f"start_exam_{subject_code}_{year_val}_{next_offset}_{current_score}"))
+    builder.row(types.InlineKeyboardButton(text="➡️ Next Question",
+                                           callback_data=f"start_exam_{subject_code}_{year_val}_{month_val}_{next_offset}_{current_score}"))
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
     feedback = f"{result_text}\n\n💡 **Explanation:**\n{explanation}"
@@ -1176,12 +1092,8 @@ async def show_bookmarks(callback: types.CallbackQuery):
         for bm in bookmarks:
             q_id, subj, year, q_text = bm
             bm_text += f"📌 ID: {q_id} | [{subj} - {year}]\n{q_text[:50]}...\n\n"
-            if subj == "Freshman":
-                builder.row(types.InlineKeyboardButton(text=f"🔍 View Question #{q_id}",
-                                                       callback_data=f"ans_Freshman_{year}_0_{q_id}_0_A"))
-            else:
-                builder.row(types.InlineKeyboardButton(text=f"🔍 View Question #{q_id}",
-                                                       callback_data=f"ans_{subj}_{year}_0_{q_id}_0_A"))
+            builder.row(types.InlineKeyboardButton(text=f"🔍 View Question #{q_id}",
+                                                   callback_data=f"ans_{subj}_{year.split('_')[0]}_{year.split('_')[1]}_0_{q_id}_0_A"))
     else:
         bm_text = "🔖 No bookmarks saved yet."
 
@@ -1295,7 +1207,7 @@ async def main():
     flask_thread.daemon = True
     flask_thread.start()
     print("🌐 Flask Web Server & Mini App API started successfully on port 8080")
-    print("🚀 WanK Exam Bot is running live with fully fixed Freshman dataset loading!")
+    print("🚀 WanK Exam Bot is running live!")
     await dp.start_polling(bot)
 
 
