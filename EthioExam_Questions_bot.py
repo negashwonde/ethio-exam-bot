@@ -14,7 +14,7 @@ app = Flask("")
 
 DB_NAME = "brand_new_exam.db"
 
-# የተሟላ የ Telegram Mini App (Frontend ከ CS/IT (2017 ጥር/ሰኔ) እና ከፍሬሽማን ኮርሶች ጋር ከ 3 ጥያቄዎች ነጻ ገደብ ጋር)
+# የተሟላ የ Telegram Mini App (ከማንኛውም የውጭ ፎቶ ነጻ የሆነ እና ከ 3 ጥያቄዎች ነጻ ገደብ ጋር)
 MINI_APP_HTML = """
 <!DOCTYPE html>
 <html lang="am">
@@ -93,7 +93,7 @@ MINI_APP_HTML = """
         <button class="btn" onclick="alert('🎧 እርዳታ ለማግኘት በስልክ ቁጥር 0919245693 ወይም @neguRoha ያግኙን።')">🎧 እርዳታ እና ድጋፍ (Support)</button>
     </div>
 
-    <!-- Year & Month SubMenu View (CS ወይም IT ሲጫኑ የሚመጣ) -->
+    <!-- Year & Month SubMenu View -->
     <div id="submenu-view" class="card hidden">
         <h3 id="submenu-title" style="color: #38bdf8;">Select exam year and month:</h3>
         <button class="btn" onclick="startExam(selectedSubject, '2017 ጥር')">📅 2017 ጥር</button>
@@ -621,7 +621,7 @@ async def set_department_action(callback: types.CallbackQuery):
     await back_to_menu(callback)
 
 
-# 1. Computer Science ወራትን መምረጫ ሜኑ (2017 ጥር, 2017 ሰኔ, 2018 ጥር, 2018 ሰኔ)
+# 1. Computer Science ወራትን መምረጫ ሜኑ
 @dp.callback_query(F.data == "dept_cs_menu")
 async def cs_years_menu(callback: types.CallbackQuery):
     await callback.answer()
@@ -640,7 +640,7 @@ async def cs_years_menu(callback: types.CallbackQuery):
     await callback.message.edit_text(text_msg, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-# 2. Information Technology ወራትን መምረጫ ሜኑ (2017 ጥር, 2017 ሰኔ, 2018 ጥር, 2018 ሰኔ)
+# 2. Information Technology ወራትን መምረጫ ሜኑ
 @dp.callback_query(F.data == "dept_it_menu")
 async def it_years_menu(callback: types.CallbackQuery):
     await callback.answer()
@@ -694,12 +694,12 @@ async def start_specific_exam(callback: types.CallbackQuery):
 
     if parts[2] == "Freshman":
         subject_code = "Freshman"
-        exam_year_val = parts[3] # Psychology, Geography, ወይም Logic
+        exam_year_val = parts[3]
         offset_val = int(parts[4]) if len(parts) > 4 else 0
         current_score = int(parts[5]) if len(parts) > 5 else 0
     else:
-        subject_code = parts[2] # CS ወይም IT
-        exam_year_val = f"{parts[3]} {parts[4]}" # 2017 ጥር, 2017 ሰኔ, ወዘተ.
+        subject_code = parts[2]
+        exam_year_val = f"{parts[3]} {parts[4]}"
         offset_val = int(parts[5]) if len(parts) > 5 else 0
         current_score = int(parts[6]) if len(parts) > 6 else 0
 
