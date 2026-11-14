@@ -370,13 +370,20 @@ def run_flask():
     app.run(host="0.0.0.0", port=port)
 
 
-# 2. የቴሌግራም ቦት ማዋቀር
-TOKEN = "9095070080:AAHXsxP4rlAI4poCKkylybtmLwener1G9Lk"
-ADMIN_ID = 680798556  # የእርስዎ የአድሚን ቴሌግራም ID
+
+
+# 2. Telegram Bot Configuration
+TOKEN = os.environ.get("BOT_TOKEN")
+
+if not TOKEN:
+    raise RuntimeError("BOT_TOKEN is missing in Render Environment Variables")
+
+ADMIN_ID = 680798556  # Admin Telegram ID
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
+
 
 
 # 3. ዳታቤዙን ማቀናጀት እና የ CS, IT እና Freshman ፋይሎችን በትክክል መጫን
