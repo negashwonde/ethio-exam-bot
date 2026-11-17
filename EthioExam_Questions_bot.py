@@ -127,9 +127,9 @@ MINI_APP_HTML = """
     </div>
 
     <div id="payment-view" class="card hidden" style="text-align: center;">
-        <h2 style="color: #f87171;">🔒 3ቱን ነጻ ጥያቄዎች ጨርሰዋል!</h2>
+        <h2 style="color: #f87171;">🔒 የመጀመሪያዎቹን 3 ነጻ ጥያቄዎች ጨርሰዋል!</h2>
         <p style="font-size: 14px; line-height: 1.6; text-align: left; background: #1e293b; padding: 12px; border-radius: 8px;">
-            🎓 ሙሉ ጥያቄዎች እና ማብራሪያዎች ክፍያ መፈጸም አለብዎት።<br>
+            🎓 ተጨማሪ ጥያቄዎችን ለመፈተን ክፍያ መፈጸም አለብዎት።<br>
             💰 <b>ክፍያው 100 Birr ብቻ ነው!</b><br><br>
             🏦 <b>CBE:</b> <code>1000268717823</code> (ነጋሽ ወንዴ)<br>
             📱 <b>Telebirr:</b> <code>0919245693</code> (ነጋሽ ወንዴ)<br><br>
@@ -292,21 +292,44 @@ def api_questions():
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
-                   (user_id,))
+    cursor.execute("SELECT payment_status, paid_department FROM users WHERE user_id = ?", (user_id,))
     user_data = cursor.fetchone()
 
-    free_used = user_data[0] if user_data else 0
-    pay_status = user_data[1] if user_data else 'free'
-    paid_depts = user_data[2] if user_data else ''
+    pay_status = user_data[0] if user_data else 'free'
+    paid_depts = user_data[1] if user_data else ''
     pay_key = f"{subj}_{year}"
     is_paid = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
-    if not is_paid and free_used >= 3:
-        conn.close()
-        return jsonify({"locked": True, "questions": []})
+    # 🔒 እያንዳንዱ ኮርስ ለየብቻው የመጀመሪያዎቹን 3 ጥያቄዎች በነጻ ይሰጣል፣ ከዛ በላይ ሲገባ ይቆልፋል!
+    if not is_paid:
+        cursor.execute("SELECT id FROM questions WHERE subject = ? AND (exam_year LIKE ? OR exam_year LIKE ?)",
+                       (subj, f"%{year}%", f"%{year.replace('ጥር', 'Tir').replace('ሰኔ', 'Sane')}%"))
+        rows = cursor.fetchall()
+        if not rows:
+            cursor.execute("SELECT id FROM questions WHERE subject = ?", (subj,))
+            rows = cursor.fetchall()
 
-    # Ultra-flexible search matching to prevent empty results
+        # 3 ጥያቄዎች ብቻ በነጻ እንዲታዩ ገደብ ማድረግ
+        limited_ids = [r[0] for r in rows[:3]]
+        if limited_ids:
+            placeholders = ','.join(['?'] * len(limited_ids))
+            cursor.execute(
+                f"SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE id IN ({placeholders})",
+                limited_ids)
+            rows = cursor.fetchall()
+        else:
+            rows = []
+        conn.close()
+
+        if not rows:
+            return jsonify({"locked": True, "questions": []})
+
+        questions = [
+            {"id": r[0], "question_text": r[1], "option_a": r[2], "option_b": r[3], "option_c": r[4], "option_d": r[5],
+             "correct_answer": r[6], "explanation": r[7]} for r in rows]
+        return jsonify({"locked": False, "questions": questions})
+
+    # ከተከፈለ ሙሉውን ጥያቄ ያመጣል
     if subj == "Freshman":
         cursor.execute(
             "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE subject = 'Freshman' AND exam_year LIKE ?",
@@ -317,7 +340,6 @@ def api_questions():
             (subj, f"%{year}%", f"%{year.replace('ጥር', 'Tir').replace('ሰኔ', 'Sane')}%"))
 
     rows = cursor.fetchall()
-
     if not rows:
         cursor.execute(
             "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE subject = ?",
@@ -325,7 +347,6 @@ def api_questions():
         rows = cursor.fetchall()
 
     conn.close()
-
     questions = [
         {"id": r[0], "question_text": r[1], "option_a": r[2], "option_b": r[3], "option_c": r[4], "option_d": r[5],
          "correct_answer": r[6], "explanation": r[7]} for r in rows]
@@ -343,21 +364,6 @@ def api_answer():
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    pay_key = f"{subj}_{year}"
-    cursor.execute("SELECT free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
-                   (user_id,))
-    res_user = cursor.fetchone()
-    if res_user:
-        free_used, pay_status, paid_depts = res_user
-        is_paid = pay_status == 'paid' and pay_key in paid_depts.split(",")
-        if not is_paid and free_used >= 3:
-            conn.close()
-            return jsonify({"locked": True})
-        if not is_paid:
-            cursor.execute("UPDATE users SET free_questions_used = free_questions_used + 1 WHERE user_id = ?",
-                           (user_id,))
-            conn.commit()
-
     cursor.execute("SELECT correct_answer FROM questions WHERE id = ?", (q_id,))
     res = cursor.fetchone()
     correct_ans = res[0] if res else "A"
@@ -421,7 +427,7 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
     builder.row(types.InlineKeyboardButton(text="🇪🇹 አማርኛ", callback_data="set_lang_am"),
                 types.InlineKeyboardButton(text="🇬🇧 English", callback_data="set_lang_en"))
 
-    welcome_text = f"👋 **ሰላም {user_name}!**\n\n🎓 **ወደ Wank Exam ዝግጅት ቦት እንኳን ደህና መጡ።**\nለኮምፒውተር ሳይንስ (CS)፣ ለአይቲ (IT) እና ለፍሬሽማን የፈተና ጥያቄዎች እዚህ ያገኛሉ።\n\n💡 *ማሳሰቢያ:* የመጀመሪያዎቹ **3 ጥያቄዎች በነጻ** መፈተን ይችላሉ!\n\n👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:"
+    welcome_text = f"👋 **ሰላም {user_name}!**\n\n🎓 **ወደ Wank Exam ዝግጅት ቦት እንኳን ደህና መጡ።**\nለኮምፒውተር ሳይንስ (CS)፣ ለአይቲ (IT) እና ለፍሬሽማን የፈተና ጥያቄዎች እዚህ ያገኛሉ።\n\n💡 *ማሳሰቢያ:* እያንዳንዱ ኮርስ ላይ የመጀመሪያዎቹ **3 ጥያቄዎች በነጻ** መፈተን ይችላሉ!\n\n👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:"
     if edit:
         await message_or_callback.message.edit_text(welcome_text, reply_markup=builder.as_markup(),
                                                     parse_mode="Markdown")
@@ -549,22 +555,19 @@ async def start_specific_exam(callback: types.CallbackQuery):
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT department, lang, free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
-        (user_id,))
+    cursor.execute("SELECT payment_status, paid_department FROM users WHERE user_id = ?", (user_id,))
     user_data = cursor.fetchone()
 
-    user_lang = user_data[1] if user_data else "am"
-    free_used = user_data[2] if user_data else 0
-    pay_status = user_data[3] if user_data else 'free'
-    paid_depts = user_data[4] if user_data else ''
+    pay_status = user_data[0] if user_data else 'free'
+    paid_depts = user_data[1] if user_data else ''
 
     pay_key = f"{subject_code}_{exam_year_val}"
     is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
-    if not is_paid_for_this and (free_used >= 3 or offset_val >= 3):
+    # 🔒 ቴሌግራም ቦት በኩልም ከ 3 ጥያቄ በላይ ሲገባ ክፍያ ይጠይቃል
+    if not is_paid_for_this and offset_val >= 3:
         conn.close()
-        await send_payment_prompt(callback.message, f"{subject_code} ({exam_year_val})", pay_key, user_lang)
+        await send_payment_prompt(callback.message, f"{subject_code} ({exam_year_val})", pay_key, 'am')
         return
 
     if subject_code == "Freshman":
@@ -578,11 +581,6 @@ async def start_specific_exam(callback: types.CallbackQuery):
              offset_val))
 
     q = cursor.fetchone()
-    if not q:
-        cursor.execute(
-            "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE subject = ? ORDER BY id ASC LIMIT 1 OFFSET ?",
-            (subject_code, offset_val))
-        q = cursor.fetchone()
     conn.close()
 
     if q:
@@ -608,13 +606,11 @@ async def start_specific_exam(callback: types.CallbackQuery):
             builder.row(types.InlineKeyboardButton(text=f"D) {opt_d}",
                                                    callback_data=f"ans_{subject_code}_{yr_part}_{mth_part}_{offset_val}_{q_id}_{current_score}_D"))
 
-        bm_text = "🔖 ማስቀመጫ (Bookmark)" if user_lang == 'am' else "🔖 Bookmark"
-        menu_text = "🏠 ዋና ማውጫ" if user_lang == 'am' else "🏠 Main Menu"
-        builder.row(types.InlineKeyboardButton(text=bm_text, callback_data=f"bm_{q_id}"),
-                    types.InlineKeyboardButton(text=menu_text, callback_data="back_menu"))
+        builder.row(types.InlineKeyboardButton(text="🔖 Bookmark", callback_data=f"bm_{q_id}"),
+                    types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
 
         q_num_display = offset_val + 1
-        rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - free_used})" if not is_paid_for_this else " (VIP የተከፈተ 🌟)"
+        rem_text = f" (ቀሪ ነጻ ጥያቄ: {3 - offset_val})" if not is_paid_for_this else " (VIP 🌟)"
         score_display = f" | ውጤት: {current_score}/{offset_val}" if offset_val > 0 else ""
 
         await callback.message.answer(f"📝 **Exam — Q{q_num_display}{score_display}{rem_text}:**\n\n{q_text}",
@@ -622,13 +618,13 @@ async def start_specific_exam(callback: types.CallbackQuery):
     else:
         percentage = int((current_score / offset_val) * 100) if offset_val > 0 else 0
         builder = InlineKeyboardBuilder()
-        builder.row(types.InlineKeyboardButton(text="🏠 ዋና ማውጫ", callback_data="back_menu"))
+        builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
         summary_text = f"🎉 **እንኳን ደስ አለዎት!** በዚህ ምድብ ያሉትን ጥያቄዎች በሙሉ አጠናቀዋል።\n\n📊 **የእርስዎ ውጤት:**\n✅ ትክክለኛ መልሶች: **{current_score}/{offset_val}**\n💯 መቶኛ: **{percentage}%**"
         await callback.message.answer(summary_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
 async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: str, lang: str):
-    pay_text = f"🔒 **3ቱን ነጻ ጥያቄዎች ጨርሰዋል!**\n\n🎓 ለ **{dept_name}** ሙሉ ጥያቄዎች ክፍያ መፈጸም አለብዎት።\n💰 **ክፍያው 100 Birr ብቻ ነው!**\n\n🏦 **CBE:** `1000268717823` (ነጋሽ ወንዴ)\n📱 **Telebirr:** `0919245693` (ነጋሽ ወንዴ)\n\n📸 ክፍያ ከፈጸሙ በኋላ ስክሪንሾቱን ወደዚህ ቦት ይላኩ!"
+    pay_text = f"🔒 **የመጀመሪያዎቹን 3 ነጻ ጥያቄዎች ጨርሰዋል!**\n\n🎓 ለ **{dept_name}** ተጨማሪ ጥያቄዎች ክፍያ መፈጸም አለብዎት።\n💰 **ክፍያው 100 Birr ብቻ ነው!**\n\n🏦 **CBE:** `1000268717823` (ነጋሽ ወንዴ)\n📱 **Telebirr:** `0919245693` (ነጋሽ ወንዴ)\n\n📸 ክፍያ ከፈጸሙ በኋላ ስክሪንሾቱን ወደዚህ ቦት ይላኩ!"
     builder = InlineKeyboardBuilder()
     builder.row(types.InlineKeyboardButton(text="📤 ስክሪንሾት ላክ", callback_data=f"upload_screenshot_info_{pay_key}"))
     builder.row(types.InlineKeyboardButton(text="🏠 ዋና ማውጫ", callback_data="back_menu"))
@@ -773,23 +769,8 @@ async def check_answer(callback: types.CallbackQuery):
         current_score = int(parts[6])
         chosen_opt = parts[7]
 
-    pay_key = f"{subject_code}_{exam_year_val}"
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT free_questions_used, payment_status, paid_department FROM users WHERE user_id = ?",
-                   (user_id,))
-    res_user = cursor.fetchone()
-    if res_user:
-        free_used, pay_status, paid_depts = res_user
-        is_paid = pay_status == 'paid' and pay_key in paid_depts.split(",")
-        if not is_paid and offset_val < 3:
-            cursor.execute("UPDATE users SET free_questions_used = free_questions_used + 1 WHERE user_id = ?",
-                           (user_id,))
-            conn.commit()
-
-    cursor.execute(
-        "INSERT OR IGNORE INTO user_progress (user_id, total_attempted, correct_count, wrong_count) VALUES (?, 0, 0, 0)",
-        (user_id,))
     cursor.execute("SELECT correct_answer, explanation FROM questions WHERE id = ?", (q_id,))
     res = cursor.fetchone()
     if res:
@@ -798,10 +779,16 @@ async def check_answer(callback: types.CallbackQuery):
             current_score += 1
             result_text = "✅ **Correct!**"
             cursor.execute(
+                "INSERT OR IGNORE INTO user_progress (user_id, total_attempted, correct_count, wrong_count) VALUES (?, 0, 0, 0)",
+                (user_id,))
+            cursor.execute(
                 "UPDATE user_progress SET total_attempted = total_attempted + 1, correct_count = correct_count + 1 WHERE user_id = ?",
                 (user_id,))
         else:
             result_text = f"❌ **Incorrect. Correct answer: {correct}**"
+            cursor.execute(
+                "INSERT OR IGNORE INTO user_progress (user_id, total_attempted, correct_count, wrong_count) VALUES (?, 0, 0, 0)",
+                (user_id,))
             cursor.execute(
                 "UPDATE user_progress SET total_attempted = total_attempted + 1, wrong_count = wrong_count + 1 WHERE user_id = ?",
                 (user_id,))
@@ -946,7 +933,7 @@ async def main():
     flask_thread.daemon = True
     flask_thread.start()
     print("🌐 Flask Web Server started on port 8080")
-    print("🚀 WanK Exam Bot is running live with Universal Safe Matching!")
+    print("🚀 WanK Exam Bot is running live with Per-Course 3 Free Questions & Safe Appending!")
     await dp.start_polling(bot)
 
 
