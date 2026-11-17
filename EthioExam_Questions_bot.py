@@ -10,9 +10,6 @@ from threading import Thread
 
 from import_questions import init_db
 
-# ==========================================
-# 1. ዌብ ሰርቨር (Flask) ማዋቀር - ለ Mini App API
-# ==========================================
 app = Flask("")
 DB_NAME = "brand_new_exam.db"
 
@@ -81,7 +78,6 @@ MINI_APP_HTML = """
     <h1>🎓 Wank Exam Portal</h1>
     <p id="user-greeting" style="color: #cbd5e1; font-size: 14px;">ሰላም!</p>
 
-    <!-- Main Menu View -->
     <div id="menu-view" class="card">
         <div class="info-box">👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:</div>
         <button class="btn" onclick="showSubMenu('CS')">💻 Computer Science Exit Exam</button>
@@ -94,7 +90,6 @@ MINI_APP_HTML = """
         <button class="btn" onclick="alert('🎧 እርዳታ ለማግኘት በስልክ ቁጥር 0919245693 ወይም @neguRoha ያግኙን።')">🎧 እርዳታ እና ድጋፍ (Support)</button>
     </div>
 
-    <!-- Year & Month SubMenu View -->
     <div id="submenu-view" class="card hidden">
         <h3 id="submenu-title" style="color: #38bdf8;">Select exam year and month:</h3>
         <button class="btn" onclick="startExam(selectedSubject, '2017 ጥር')">📅 2017 ጥር</button>
@@ -104,7 +99,6 @@ MINI_APP_HTML = """
         <button class="btn" onclick="backToMenu()" style="background: #475569; margin-top: 15px;">🏠 ዋና ማውጫ (Main Menu)</button>
     </div>
 
-    <!-- Freshman Courses Menu View -->
     <div id="freshman-view" class="card hidden">
         <h3 style="color: #38bdf8;">📚 Freshman Program (Natural Science)</h3>
         <div class="info-box">👇 የሚፈልጉትን ኮርስ ይምረጡ:</div>
@@ -118,7 +112,6 @@ MINI_APP_HTML = """
         <button class="btn" onclick="backToMenu()" style="background: #475569; margin-top: 15px;">🏠 ዋና ማውጫ (Main Menu)</button>
     </div>
 
-    <!-- Exam View -->
     <div id="exam-view" class="card hidden">
         <h3 id="q-title" style="color: #38bdf8;">ጥያቄ</h3>
         <p id="q-text" style="font-size: 15px; line-height: 1.5;"></p>
@@ -133,7 +126,6 @@ MINI_APP_HTML = """
         <button class="btn" onclick="backToMenu()" style="background: #475569; text-align: center; margin-top: 10px;">🏠 ዋና ማውጫ</button>
     </div>
 
-    <!-- Payment Prompt View -->
     <div id="payment-view" class="card hidden" style="text-align: center;">
         <h2 style="color: #f87171;">🔒 3ቱን ነጻ ጥያቄዎች ጨርሰዋል!</h2>
         <p style="font-size: 14px; line-height: 1.6; text-align: left; background: #1e293b; padding: 12px; border-radius: 8px;">
@@ -141,12 +133,11 @@ MINI_APP_HTML = """
             💰 <b>ክፍያው 100 Birr ብቻ ነው!</b><br><br>
             🏦 <b>CBE:</b> <code>1000268717823</code> (ነጋሽ ወንዴ)<br>
             📱 <b>Telebirr:</b> <code>0919245693</code> (ነጋሽ ወንዴ)<br><br>
-            📸 <b>ክፍያ ከፈጸሙ በኋላ ስክሪንሾቱን ወደ ቴሌግራም ቦቱ ይላኩ! አድሚኑ ሲያጸድቅልዎ ሙሉው ጥያቄ ይከፈታል።</b>
+            📸 <b>ክፍያ ከፈጸሙ በኋላ ስክሪንሾቱን ወደ ቴሌግራም ቦቱ ይላኩ!</b>
         </p>
         <button class="btn" onclick="backToMenu()" style="text-align: center;">🏠 ዋና ማውጫ ተመለስ</button>
     </div>
 
-    <!-- Result View -->
     <div id="result-view" class="card hidden" style="text-align: center;">
         <h2>🎉 እንኳን ደስ አለዎት!</h2>
         <p id="final-score" style="font-size: 18px; margin: 15px 0;"></p>
@@ -295,8 +286,8 @@ def webapp():
 
 @app.route("/api/questions")
 def api_questions():
-    subj = request.args.get("subject", "CS")
-    year = request.args.get("year", "2017 ጥር")
+    subj = request.args.get("subject", "CS").strip()
+    year = request.args.get("year", "2017 ጥር").strip()
     user_id = int(request.args.get("user_id", 0))
 
     conn = sqlite3.connect(DB_NAME)
@@ -315,10 +306,25 @@ def api_questions():
         conn.close()
         return jsonify({"locked": True, "questions": []})
 
-    cursor.execute(
-        "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE subject = ? AND exam_year = ?",
-        (subj, year))
+    # Flexible database search queries
+    if subj == "Freshman":
+        cursor.execute(
+            "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE subject = 'Freshman' AND exam_year LIKE ?",
+            (f"%{year}%",))
+    else:
+        cursor.execute(
+            "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE subject = ? AND exam_year LIKE ?",
+            (subj, f"%{year}%"))
+
     rows = cursor.fetchall()
+
+    # Fallback if exact match fails
+    if not rows:
+        cursor.execute(
+            "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE exam_year LIKE ?",
+            (f"%{year}%",))
+        rows = cursor.fetchall()
+
     conn.close()
 
     questions = [
@@ -365,11 +371,7 @@ def run_flask():
     app.run(host="0.0.0.0", port=port)
 
 
-# ==========================================
-# 2. TELEGRAM BOT CONFIGURATION
-# ==========================================
 TOKEN = os.environ.get("BOT_TOKEN")
-
 if not TOKEN:
     raise RuntimeError("BOT_TOKEN is missing!")
 
@@ -379,9 +381,6 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 
-# ==========================================
-# 3. BOT HANDLERS & INTERFACES
-# ==========================================
 async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -569,10 +568,21 @@ async def start_specific_exam(callback: types.CallbackQuery):
         await send_payment_prompt(callback.message, f"{subject_code} ({exam_year_val})", pay_key, user_lang)
         return
 
-    cursor.execute(
-        "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE subject = ? AND exam_year = ? ORDER BY id ASC LIMIT 1 OFFSET ?",
-        (subject_code, exam_year_val, offset_val))
+    if subject_code == "Freshman":
+        cursor.execute(
+            "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE subject = 'Freshman' AND exam_year LIKE ? ORDER BY id ASC LIMIT 1 OFFSET ?",
+            (f"%{exam_year_val}%", offset_val))
+    else:
+        cursor.execute(
+            "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE subject = ? AND exam_year LIKE ? ORDER BY id ASC LIMIT 1 OFFSET ?",
+            (subject_code, f"%{exam_year_val}%", offset_val))
+
     q = cursor.fetchone()
+    if not q:
+        cursor.execute(
+            "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE exam_year LIKE ? ORDER BY id ASC LIMIT 1 OFFSET ?",
+            (f"%{exam_year_val}%", offset_val))
+        q = cursor.fetchone()
     conn.close()
 
     if q:
@@ -635,7 +645,6 @@ async def screenshot_info(callback: types.CallbackQuery):
 async def handle_payment_screenshot(message: types.Message):
     user_id = message.from_user.id
     user_name = message.from_user.full_name
-    username = message.from_user.username
     photo_id = message.photo[-1].file_id
 
     conn = sqlite3.connect(DB_NAME)
@@ -909,7 +918,7 @@ async def tutorial_links_handler(callback: types.CallbackQuery):
 
 
 @dp.callback_query(F.data == "help_menu")
-async def help_handler(callback: types.CallbackQuery):
+async def help_username(callback: types.CallbackQuery):
     await callback.answer()
     builder = InlineKeyboardBuilder()
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
@@ -921,7 +930,7 @@ async def help_handler(callback: types.CallbackQuery):
 async def about_bot_handler(callback: types.CallbackQuery):
     await callback.answer()
     builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
+    builder.row(types.InlineKeyboardButton(text="🏠 Main_Menu", callback_data="back_menu"))
     await callback.message.edit_text("🤖 **About WankExamBot**\n\nSmart exam assistant for university students.",
                                      reply_markup=builder.as_markup(), parse_mode="Markdown")
 
@@ -931,18 +940,13 @@ async def back_to_menu(callback: types.CallbackQuery):
     await show_main_menu(callback, callback.from_user.id, callback.from_user.first_name, edit=True)
 
 
-# ==========================================
-# 4. MAIN APPLICATION ENTRY POINT
-# ==========================================
 async def main():
     init_db()
-
     flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
     print("🌐 Flask Web Server started on port 8080")
-    print("🚀 WanK Exam Bot is running live with Synchronized Datasets!")
-
+    print("🚀 WanK Exam Bot is running live with Flexible Question Matching!")
     await dp.start_polling(bot)
 
 
