@@ -64,7 +64,7 @@ def init_db():
     finally:
         conn.close()
 
-# 📌 የቀድሞዎቹ ዳታዎች ሁሉ ሳይነኩ፣ አዳዲስ የ Social Science Freshman ፋይሎች በወቅቱ ተካትተዋል:
+# 📌 የሶሻል ሳይንስ ኮርሶች ከስማቸው ጋር በትክክል እንዲጣጣሙ ተደርጓል:
 FILES_TO_IMPORT = [
     # Computer Science Exit Exams
     ("CS_2017_Tir_100_Unique_Final.csv", "CS", "2017 ጥር"),
@@ -87,7 +87,7 @@ FILES_TO_IMPORT = [
     ("Inclusiveness_Ch1_Ch2_100_Mid_Exam_Questions.csv", "Freshman", "Inclusiveness"),
     ("Math_Natural_Sciences_Ch1_Ch2_MidExam_100Q.csv", "Freshman", "Math"),
 
-    # 📚 Freshman Program (Social Science) - አዳዲስ የተጫኑ ፋይሎች:
+    # 📚 Freshman Program (Social Science) - በትክክለኛው የ Exam Year ስሞች:
     ("freshman_direct_download_Anthropology_100_Questions.csv", "Freshman_Social", "Anthropology"),
     ("freshman_direct_download_Geography_of_Ethiopia_100_Questions.csv", "Freshman_Social", "Geography"),
     ("freshman_direct_download_History_of_Ethiopia_and_the_Horn_100_Questions.csv", "Freshman_Social", "History"),
@@ -146,7 +146,7 @@ def load_all_exam_datasets():
         conn.execute("BEGIN")
         for file_name, records in prepared_files:
             for record in records:
-                # 🛡️ Safe Insert: ነባር ዳታዎችን በፍጹም አያጠፋም፣ ዱፕሊኬትም አያደርግም
+                # 🛡️ Safe Insert: ነባር ዳታዎችን በፍጹም አያጠፋም
                 conn.execute("""
                     INSERT INTO questions (
                         subject, exam_year, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation
@@ -158,7 +158,7 @@ def load_all_exam_datasets():
                     )
                 """, record + (record[0], record[1], record[2]))
         conn.commit()
-        print("Safe incremental import for Social Science & all datasets completed successfully!")
+        print("Safe incremental import completed successfully!")
     except Exception:
         conn.rollback()
         raise
