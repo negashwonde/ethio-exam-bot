@@ -64,7 +64,7 @@ def init_db():
     finally:
         conn.close()
 
-# 📌 የቀድሞዎቹ ዳታዎች ሁሉ ሳይነኩ፣ አዳዲስ የ Social Science Freshman ፋይሎች ጨምሮ:
+# 📌 የቀድሞዎቹ ዳታዎች ሁሉ ሳይነኩ፣ አዳዲስ የ Social Science Freshman ፋይሎች በወቅቱ ተካትተዋል:
 FILES_TO_IMPORT = [
     # Computer Science Exit Exams
     ("CS_2017_Tir_100_Unique_Final.csv", "CS", "2017 ጥር"),

@@ -117,7 +117,7 @@ MINI_APP_HTML = """
         <h3 style="color: #38bdf8;">📚 Freshman Program (Social Science)</h3>
         <div class="info-box">👇 የሚፈልጉትን ኮርስ ይምረጡ:</div>
         <button class="btn" onclick="startExam('Freshman_Social', 'Anthropology')">🏛️ Social Anthropology</button>
-        <button class="btn" onclick="startEntrySocial('Freshman_Social', 'Geography')">🌍 Geography of Ethiopia & the Horn</button>
+        <button class="btn" onclick="startExam('Freshman_Social', 'Geography')">🌍 Geography of Ethiopia & the Horn</button>
         <button class="btn" onclick="startExam('Freshman_Social', 'History')">📜 History of Ethiopia & the Horn</button>
         <button class="btn" onclick="startExam('Freshman_Social', 'Logic')">⚖️ Logic & Critical Thinking</button>
         <button class="btn" onclick="startExam('Freshman_Social', 'Civics')">🗳️ Civics and Ethical Studies</button>
@@ -188,10 +188,6 @@ MINI_APP_HTML = """
         function showSocialFreshmanMenu() {
             document.getElementById('menu-view').classList.add('hidden');
             document.getElementById('freshman-social-view').classList.remove('hidden');
-        }
-
-        function startEntrySocial(subj, yearMonth) {
-            startExam(subj, yearMonth);
         }
 
         function startExam(subj, yearMonth) {
@@ -325,7 +321,6 @@ def api_questions():
     pay_key = f"{subj}_{year}"
     is_paid = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
-    # 🔒 እያንዳንዱ ኮርስ ለየብቻው የመጀመሪያዎቹን 3 ጥያቄዎች በነጻ ይሰጣል፣ ከዛ በላይ ሲገባ ይቆልፋል!
     if not is_paid:
         if subj == "Freshman":
             cursor.execute("SELECT id FROM questions WHERE subject = 'Freshman' AND exam_year LIKE ?", (f"%{year}%",))
@@ -359,7 +354,6 @@ def api_questions():
              "correct_answer": r[6], "explanation": r[7]} for r in rows]
         return jsonify({"locked": False, "questions": questions})
 
-    # ከተከፈለ ሙሉውን ጥያቄ ያመጣል
     if subj == "Freshman":
         cursor.execute(
             "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE subject = 'Freshman' AND exam_year LIKE ?",
@@ -736,18 +730,13 @@ async def start_specific_exam(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     data_parts = callback.data.replace("start_exam_", "").split("_")
 
-    if data_parts[0] == "Freshman":
-        subject_code = "Freshman"
-        exam_year_val = data_parts[1]
-        offset_val = int(data_parts[2]) if len(data_parts) > 2 else 0
-        current_score = int(data_parts[3]) if len(data_parts) > 3 else 0
-    elif data_parts[0] == "Freshman" and data_parts[1] == "Social":
+    if data_parts[0] == "Freshman" and len(data_parts) > 1 and data_parts[1] == "Social":
         subject_code = "Freshman_Social"
         exam_year_val = data_parts[2]
         offset_val = int(data_parts[3]) if len(data_parts) > 3 else 0
         current_score = int(data_parts[4]) if len(data_parts) > 4 else 0
-    elif data_parts[0] == "Freshman_Social":
-        subject_code = "Freshman_Social"
+    elif data_parts[0] == "Freshman":
+        subject_code = "Freshman"
         exam_year_val = data_parts[1]
         offset_val = int(data_parts[2]) if len(data_parts) > 2 else 0
         current_score = int(data_parts[3]) if len(data_parts) > 3 else 0
@@ -768,7 +757,6 @@ async def start_specific_exam(callback: types.CallbackQuery):
     pay_key = f"{subject_code}_{exam_year_val}"
     is_paid_for_this = pay_status == 'paid' and pay_key in paid_depts.split(",")
 
-    # 🔒 ቴሌግራም ቦት በኩልም ከ 3 ጥያቄ በላይ ሲገባ ክፍያ ይጠይቃል
     if not is_paid_for_this and offset_val >= 3:
         conn.close()
         await send_payment_prompt(callback.message, f"{subject_code} ({exam_year_val})", pay_key)
@@ -829,7 +817,7 @@ async def check_answer(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     parts = callback.data.split("_")
 
-    if parts[1] == "Freshman" and parts[2] == "Social":
+    if parts[1] == "Freshman" and len(parts) > 2 and parts[2] == "Social":
         subject_code = "Freshman_Social"
         exam_year_val = parts[3]
         offset_val = int(parts[4])
@@ -892,122 +880,6 @@ async def check_answer(callback: types.CallbackQuery):
     builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.answer(f"{result_text}\n\n💡 **Explanation:**\n{explanation}",
                                   reply_markup=builder.as_markup(), parse_mode="Markdown")
-
-
-@dp.callback_query(F.data.startswith("bm_"))
-async def bookmark_question(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-    q_id = int(callback.data.split("_")[1])
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    try:
-        cursor.execute("INSERT INTO bookmarks (user_id, question_id) VALUES (?, ?)", (user_id, q_id))
-        conn.commit()
-        await callback.answer("✅ Added to Bookmarks!", show_alert=True)
-    except sqlite3.IntegrityError:
-        await callback.answer("ℹ️ Already bookmarked!", show_alert=True)
-    conn.close()
-
-
-@dp.callback_query(F.data == "my_bookmarks")
-async def show_bookmarks(callback: types.CallbackQuery):
-    await callback.answer()
-    user_id = callback.from_user.id
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT q.id, q.subject, q.exam_year, q.question_text FROM questions q JOIN bookmarks b ON q.id = b.question_id WHERE b.user_id = ?",
-        (user_id,))
-    bookmarks = cursor.fetchall()
-    conn.close()
-
-    builder = InlineKeyboardBuilder()
-    if bookmarks:
-        bm_text = "🔖 **Bookmarked Questions:**\n\n"
-        for bm in bookmarks:
-            q_id, subj, yr, q_text = bm
-            bm_text += f"📌 ID: {q_id} | [{subj} - {yr}]\n{q_text[:50]}...\n\n"
-            if subj == "Freshman":
-                builder.row(types.InlineKeyboardButton(text=f"🔍 View Question #{q_id}",
-                                                       callback_data=f"start_exam_Freshman_{yr}_0_0"))
-            elif subj == "Freshman_Social":
-                builder.row(types.InlineKeyboardButton(text=f"🔍 View Question #{q_id}",
-                                                       callback_data=f"start_exam_Freshman_Social_{yr}_0_0"))
-            else:
-                yr_p, mth_p = yr.split(" ")
-                builder.row(types.InlineKeyboardButton(text=f"🔍 View Question #{q_id}",
-                                                       callback_data=f"start_exam_{subj}_{yr_p}_{mth_p}_0_0"))
-    else:
-        bm_text = "🔖 No bookmarks saved yet."
-    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
-    await callback.message.edit_text(bm_text, reply_markup=builder.as_markup(), parse_mode="Markdown")
-
-
-@dp.callback_query(F.data == "my_progress")
-async def progress_handler(callback: types.CallbackQuery):
-    await callback.answer()
-    user_id = callback.from_user.id
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT total_attempted, correct_count, wrong_count FROM user_progress WHERE user_id = ?",
-                   (user_id,))
-    prog = cursor.fetchone()
-    conn.close()
-    total, correct, wrong = prog if prog else (0, 0, 0)
-    builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
-    await callback.message.edit_text(
-        f"📊 **My Progress:**\n\n📝 Total Attempted: **{total}**\n✅ Correct: **{correct}**\n❌ Wrong: **{wrong}**",
-        reply_markup=builder.as_markup(), parse_mode="Markdown")
-
-
-@dp.callback_query(F.data == "tutorial_package")
-async def tutorial_package_handler(callback: types.CallbackQuery):
-    await callback.answer()
-    builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="💻 Computer Science", callback_data="tut_cs"),
-                types.InlineKeyboardButton(text="📡 Information Technology", callback_data="tut_it"))
-    builder.row(types.InlineKeyboardButton(text="📚 Freshman (Natural)", callback_data="tut_fresh_nat"),
-                types.InlineKeyboardButton(text="📚 Freshman (Social)", callback_data="tut_fresh_soc"))
-    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
-    await callback.message.edit_text("🎓 **Documents (PPT/PDF)**\n\nSelect a category:",
-                                     reply_markup=builder.as_markup(), parse_mode="Markdown")
-
-
-@dp.callback_query(F.data.startswith("tut_"))
-async def tutorial_links_handler(callback: types.CallbackQuery):
-    await callback.answer()
-    links = {
-        "tut_cs": ("💻 Computer Science Documents", "https://t.me/NegashComputerTips/261"),
-        "tut_it": ("📡 Information Technology Documents", "https://t.me/NegashComputerTips/263"),
-        "tut_fresh_nat": ("📚 Freshman (Natural Science) Documents", "https://t.me/NegashComputerTips/264"),
-        "tut_fresh_soc": ("📚 Freshman (Social Science) Documents", "https://t.me/NegashComputerTips/265")
-    }
-    if callback.data in links:
-        title, link = links[callback.data]
-        builder = InlineKeyboardBuilder()
-        builder.row(types.InlineKeyboardButton(text="🔙 Back", callback_data="tutorial_package"),
-                    types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
-        await callback.message.edit_text(f"{title}\n\n📥 [Download Material]({link})", reply_markup=builder.as_markup(),
-                                         parse_mode="Markdown")
-
-
-@dp.callback_query(F.data == "help_menu")
-async def help_username(callback: types.CallbackQuery):
-    await callback.answer()
-    builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
-    await callback.message.edit_text("ℹ️ **Help & Support**\n📞 Phone: `0919245693`\nTelegram: @neguRoha",
-                                     reply_markup=builder.as_markup(), parse_mode="Markdown")
-
-
-@dp.callback_query(F.data == "about_bot")
-async def about_bot_handler(callback: types.CallbackQuery):
-    await callback.answer()
-    builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
-    await callback.message.edit_text("🤖 **About WankExamBot**\n\nSmart exam assistant for university students.",
-                                     reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
 @dp.callback_query(F.data == "back_menu")
