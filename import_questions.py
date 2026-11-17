@@ -64,17 +64,21 @@ def init_db():
     finally:
         conn.close()
 
+# ትክክለኛዎቹ የፋይል ስሞች እና ኬዮርዶች
 FILES_TO_IMPORT = [
+    # Computer Science
     ("CS_2017_Tir_100_Unique_Final.csv", "CS", "2017 ጥር"),
     ("CS_2017_Sane_100_Unique_Final.csv", "CS", "2017 ሰኔ"),
     ("CS_2018_Tir_100_Questions_Distinct.csv", "CS", "2018 ጥር"),
     ("CS_2018_Sane_100_Questions_Distinct.csv", "CS", "2018 ሰኔ"),
 
+    # Information Technology
     ("IT_2017_Tir_100_Unique_Final.csv", "IT", "2017 ጥር"),
     ("IT_2017_Sane_100_Unique_Final.csv", "IT", "2017 ሰኔ"),
     ("IT_2018_Tir_100_Questions_Distinct.csv", "IT", "2018 ጥር"),
     ("IT_2018_Sane_100_Questions_Distinct.csv", "IT", "2018 ሰኔ"),
 
+    # Freshman Natural Science Courses
     ("Freshman_Psychology_Complete_Master_85Qs.csv", "Freshman", "Psychology"),
     ("Geography_Ethiopia_Horn_100_Balanced_Answers.csv", "Freshman", "Geography"),
     ("Logic_and_Critical_Thinking_100_Balanced.csv", "Freshman", "Logic"),
@@ -90,6 +94,7 @@ def load_all_exam_datasets():
 
     for file_name, subject, exam_year in FILES_TO_IMPORT:
         if not os.path.exists(file_name):
+            print(f"Missing file: {file_name}")
             continue
         try:
             try:
@@ -123,8 +128,8 @@ def load_all_exam_datasets():
                     str(row["explanation"]).strip()
                 ))
             prepared_files.append((file_name, records))
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Error reading {file_name}: {e}")
 
     if not prepared_files:
         return
@@ -134,6 +139,7 @@ def load_all_exam_datasets():
         conn.execute("BEGIN")
         for file_name, records in prepared_files:
             for record in records:
+                # Safe insert without destroying existing records
                 conn.execute("""
                     INSERT INTO questions (
                         subject, exam_year, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation
@@ -145,12 +151,12 @@ def load_all_exam_datasets():
                     )
                 """, record + (record[0], record[1], record[2]))
         conn.commit()
+        print("All questions imported successfully and safely!")
     except Exception:
         conn.rollback()
         raise
     finally:
         conn.close()
-    print("Database import completed successfully.")
 
 if __name__ == "__main__":
     backup_database()

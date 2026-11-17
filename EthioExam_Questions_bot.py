@@ -306,23 +306,22 @@ def api_questions():
         conn.close()
         return jsonify({"locked": True, "questions": []})
 
-    # Flexible database search queries
+    # Ultra-flexible search matching to prevent empty results
     if subj == "Freshman":
         cursor.execute(
             "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE subject = 'Freshman' AND exam_year LIKE ?",
             (f"%{year}%",))
     else:
         cursor.execute(
-            "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE subject = ? AND exam_year LIKE ?",
-            (subj, f"%{year}%"))
+            "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE subject = ? AND (exam_year LIKE ? OR exam_year LIKE ?)",
+            (subj, f"%{year}%", f"%{year.replace('ጥር', 'Tir').replace('ሰኔ', 'Sane')}%"))
 
     rows = cursor.fetchall()
 
-    # Fallback if exact match fails
     if not rows:
         cursor.execute(
-            "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE exam_year LIKE ?",
-            (f"%{year}%",))
+            "SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation FROM questions WHERE subject = ?",
+            (subj,))
         rows = cursor.fetchall()
 
     conn.close()
@@ -574,14 +573,15 @@ async def start_specific_exam(callback: types.CallbackQuery):
             (f"%{exam_year_val}%", offset_val))
     else:
         cursor.execute(
-            "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE subject = ? AND exam_year LIKE ? ORDER BY id ASC LIMIT 1 OFFSET ?",
-            (subject_code, f"%{exam_year_val}%", offset_val))
+            "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE subject = ? AND (exam_year LIKE ? OR exam_year LIKE ?) ORDER BY id ASC LIMIT 1 OFFSET ?",
+            (subject_code, f"%{exam_year_val}%", f"%{exam_year_val.replace('ጥር', 'Tir').replace('ሰኔ', 'Sane')}%",
+             offset_val))
 
     q = cursor.fetchone()
     if not q:
         cursor.execute(
-            "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE exam_year LIKE ? ORDER BY id ASC LIMIT 1 OFFSET ?",
-            (f"%{exam_year_val}%", offset_val))
+            "SELECT id, question_text, option_a, option_b, option_c, option_d FROM questions WHERE subject = ? ORDER BY id ASC LIMIT 1 OFFSET ?",
+            (subject_code, offset_val))
         q = cursor.fetchone()
     conn.close()
 
@@ -930,7 +930,7 @@ async def help_username(callback: types.CallbackQuery):
 async def about_bot_handler(callback: types.CallbackQuery):
     await callback.answer()
     builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="🏠 Main_Menu", callback_data="back_menu"))
+    builder.row(types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="back_menu"))
     await callback.message.edit_text("🤖 **About WankExamBot**\n\nSmart exam assistant for university students.",
                                      reply_markup=builder.as_markup(), parse_mode="Markdown")
 
@@ -946,7 +946,7 @@ async def main():
     flask_thread.daemon = True
     flask_thread.start()
     print("🌐 Flask Web Server started on port 8080")
-    print("🚀 WanK Exam Bot is running live with Flexible Question Matching!")
+    print("🚀 WanK Exam Bot is running live with Universal Safe Matching!")
     await dp.start_polling(bot)
 
 
