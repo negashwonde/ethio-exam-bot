@@ -8,7 +8,6 @@ import os
 from flask import Flask, render_template_string, request, jsonify
 from threading import Thread
 
-# Import the database importer module functions
 from import_questions import init_db
 
 # ==========================================
@@ -619,7 +618,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
 
 
 async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: str, lang: str):
-    pay_text = f"🔒 **3ቱን ነጻ ጥያቄዎች ጨርሰዋል!**\n\n🎓 ለ **{dept_name}** ሙሉ ጥያቄዎች ክፍያ መፈጸም አለብዎት።\n💰 **ክፍያው 100 Birr ብቻ ነው!**\n\n🏦 **CBE:** `1000268717823` (ነጋሽ ወንዴ)<br>\n📱 **Telebirr:** `0919245693` (ነጋሽ ወንዴ)<br>\n\n📸 ክፍያ ከፈጸሙ በኋላ ስክሪንሾቱን ወደዚህ ቦት ይላኩ!"
+    pay_text = f"🔒 **3ቱን ነጻ ጥያቄዎች ጨርሰዋል!**\n\n🎓 ለ **{dept_name}** ሙሉ ጥያቄዎች ክፍያ መፈጸም አለብዎት።\n💰 **ክፍያው 100 Birr ብቻ ነው!**\n\n🏦 **CBE:** `1000268717823` (ነጋሽ ወንዴ)\n📱 **Telebirr:** `0919245693` (ነጋሽ ወንዴ)\n\n📸 ክፍያ ከፈጸሙ በኋላ ስክሪንሾቱን ወደዚህ ቦት ይላኩ!"
     builder = InlineKeyboardBuilder()
     builder.row(types.InlineKeyboardButton(text="📤 ስክሪንሾት ላክ", callback_data=f"upload_screenshot_info_{pay_key}"))
     builder.row(types.InlineKeyboardButton(text="🏠 ዋና ማውጫ", callback_data="back_menu"))
@@ -793,7 +792,7 @@ async def check_answer(callback: types.CallbackQuery):
                 "UPDATE user_progress SET total_attempted = total_attempted + 1, correct_count = correct_count + 1 WHERE user_id = ?",
                 (user_id,))
         else:
-            result_text = f"❌ **Incorrect. Correct answer: {correct}**"
+            result_text = "❌ **Incorrect.**"
             cursor.execute(
                 "UPDATE user_progress SET total_attempted = total_attempted + 1, wrong_count = wrong_count + 1 WHERE user_id = ?",
                 (user_id,))
@@ -936,17 +935,14 @@ async def back_to_menu(callback: types.CallbackQuery):
 # 4. MAIN APPLICATION ENTRY POINT
 # ==========================================
 async def main():
-    # Initialize DB tables automatically using the imported module
     init_db()
 
-    # Start Flask Web Server in background thread
     flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
     print("🌐 Flask Web Server started on port 8080")
-    print("🚀 WanK Exam Bot is running live with Modular Architecture!")
+    print("🚀 WanK Exam Bot is running live with Full Synchronized Datasets!")
 
-    # Start Telegram Bot Polling
     await dp.start_polling(bot)
 
 
