@@ -5,7 +5,6 @@ from datetime import datetime
 
 DB_NAME = "brand_new_exam.db"
 
-
 def backup_database():
     if not os.path.exists(DB_NAME):
         return
@@ -17,7 +16,6 @@ def backup_database():
     finally:
         destination.close()
         source.close()
-
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -66,8 +64,7 @@ def init_db():
     finally:
         conn.close()
 
-
-# አዳዲስ CSV ፋይሎችን እዚህ ዝርዝር ውስጥ በቀላሉ መግባት ትችላለህ (የቀድሞዎቹ በጭራሽ አይጠፉም)
+# 📌 የቀድሞዎቹ ዳታዎች ሁሉ ሳይነኩ፣ አዳዲስ የ Social Science Freshman ፋይሎች ጨምሮ:
 FILES_TO_IMPORT = [
     # Computer Science Exit Exams
     ("CS_2017_Tir_100_Unique_Final.csv", "CS", "2017 ጥር"),
@@ -88,16 +85,19 @@ FILES_TO_IMPORT = [
     ("Communicative_English_Mid_Exam_100_Questions.csv", "Freshman", "English"),
     ("General_Physics_Ch1_Ch2_100_Questions.csv", "Freshman", "Physics"),
     ("Inclusiveness_Ch1_Ch2_100_Mid_Exam_Questions.csv", "Freshman", "Inclusiveness"),
-    ("Math_Natural_Sciences_Ch1_Ch2_MidExam_100Q.csv", "Freshman", "Math")
+    ("Math_Natural_Sciences_Ch1_Ch2_MidExam_100Q.csv", "Freshman", "Math"),
 
-    # 📌 ማስታወሻ: አዲስ ፋይል ሲኖርህ ከታች በዚህ መልኩ መጨመር ትችላለህ:
-    # ("የአዲሱ_ፋይል_ስም.csv", "CS", "2019 ጥር"),
+    # 📚 Freshman Program (Social Science) - አዳዲስ የተጫኑ ፋይሎች:
+    ("freshman_direct_download_Anthropology_100_Questions.csv", "Freshman_Social", "Anthropology"),
+    ("freshman_direct_download_Geography_of_Ethiopia_100_Questions.csv", "Freshman_Social", "Geography"),
+    ("freshman_direct_download_History_of_Ethiopia_and_the_Horn_100_Questions.csv", "Freshman_Social", "History"),
+    ("freshman_direct_download_Logic_and_Critical_Thinking_100_Questions.csv", "Freshman_Social", "Logic"),
+    ("freshman_direct_download_Civics_and_Ethical_Studies_100_Questions.csv", "Freshman_Social", "Civics"),
+    ("freshman_direct_download_Global_Trends_100_Questions.csv", "Freshman_Social", "Global_Trends"),
 ]
 
-
 def load_all_exam_datasets():
-    required_columns = ["question_text", "option_a", "option_b", "option_c", "option_d", "correct_answer",
-                        "explanation"]
+    required_columns = ["question_text", "option_a", "option_b", "option_c", "option_d", "correct_answer", "explanation"]
     prepared_files = []
 
     for file_name, subject, exam_year in FILES_TO_IMPORT:
@@ -146,7 +146,7 @@ def load_all_exam_datasets():
         conn.execute("BEGIN")
         for file_name, records in prepared_files:
             for record in records:
-                # 🛡️ Safe Insert: የነባር ጥያቄዎችን ደህንነት ሙሉ በሙሉ ይጠብቃል (Duplicate አያደርግም)
+                # 🛡️ Safe Insert: ነባር ዳታዎችን በፍጹም አያጠፋም፣ ዱፕሊኬትም አያደርግም
                 conn.execute("""
                     INSERT INTO questions (
                         subject, exam_year, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation
@@ -158,13 +158,12 @@ def load_all_exam_datasets():
                     )
                 """, record + (record[0], record[1], record[2]))
         conn.commit()
-        print("Safe incremental import completed successfully! Existing data preserved.")
+        print("Safe incremental import for Social Science & all datasets completed successfully!")
     except Exception:
         conn.rollback()
         raise
     finally:
         conn.close()
-
 
 if __name__ == "__main__":
     backup_database()
