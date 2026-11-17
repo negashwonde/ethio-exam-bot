@@ -792,7 +792,7 @@ async def check_answer(callback: types.CallbackQuery):
                 "UPDATE user_progress SET total_attempted = total_attempted + 1, correct_count = correct_count + 1 WHERE user_id = ?",
                 (user_id,))
         else:
-            result_text = "❌ **Incorrect.**"
+            result_text = f"❌ **Incorrect. Correct answer: {correct}**"
             cursor.execute(
                 "UPDATE user_progress SET total_attempted = total_attempted + 1, wrong_count = wrong_count + 1 WHERE user_id = ?",
                 (user_id,))
@@ -941,7 +941,7 @@ async def main():
     flask_thread.daemon = True
     flask_thread.start()
     print("🌐 Flask Web Server started on port 8080")
-    print("🚀 WanK Exam Bot is running live with Full Synchronized Datasets!")
+    print("🚀 WanK Exam Bot is running live with Synchronized Datasets!")
 
     await dp.start_polling(bot)
 
