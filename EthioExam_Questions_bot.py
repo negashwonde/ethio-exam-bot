@@ -119,6 +119,16 @@ MINI_APP_HTML = """
             word-break: break-all;
             font-weight: bold;
         }
+        .approved-box {
+            background: #064e3b;
+            border: 1px solid #10b981;
+            color: #d1fae5;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 10px;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
@@ -132,6 +142,7 @@ MINI_APP_HTML = """
         <button class="btn" onclick="showFreshmanMenu()">📚 Freshman Program (Natural)</button>
         <button class="btn" onclick="showSocialFreshmanMenu()">📚 Freshman Program (Social)</button>
         <button class="btn" onclick="alert('📖 Remedial program exams and materials will be updated soon!')">📖 Remedial Program</button>
+        <button class="btn" onclick="showApprovedCoursesModal()">✅ የጸደቁልኝ ኮርሶች (Approved Courses)</button>
         <button class="btn" onclick="alert('📊 የርስዎን ውጤት ለማየት ዋናውን የቴሌግራም ቦት ይጠቀሙ።')">📊 የእኔ ውጤት (My Progress)</button>
         <button class="btn" onclick="showDocsDeptMenu()">📄 ሰነዶች (ማቴሪያሎች)</button>
         <button class="btn" onclick="alert('ℹ️ WankExamBot ለሁሉም የዩኒቨርሲቲ ተማሪዎች የተዘጋጀ የዝግጅት ረዳት ነው።')">ℹ️ ስለ ቦቱ (About Bot)</button>
@@ -213,6 +224,7 @@ MINI_APP_HTML = """
 
     <div id="payment-view" class="card hidden" style="text-align: center;">
         <h2 style="color: #f87171;">🔒 የመጀመሪያዎቹን 3 ነጻ ጥያቄዎች ጨርሰዋል!</h2>
+        <div id="approved-courses-banner" class="approved-box hidden"></div>
         <p style="font-size: 14px; line-height: 1.6; text-align: left; background: #1e293b; padding: 12px; border-radius: 8px;">
             🎓 ለዚህ ኮርስ <b>ሙሉ ጥያቄዎችን (Full Questions)</b> ለመፈተን ክፍያ መፈጸም አለብዎት።<br>
             💰 <b>ክፍያው 100 Birr ብቻ ነው!</b><br><br>
@@ -251,6 +263,20 @@ MINI_APP_HTML = """
         function hideAllViews() {
             ['menu-view', 'docs-dept-view', 'docs-view', 'submenu-view', 'freshman-view', 'freshman-social-view', 'exam-view', 'payment-view', 'result-view']
                 .forEach(id => document.getElementById(id).classList.add('hidden'));
+        }
+
+        function showApprovedCoursesModal() {
+            fetch(`/api/approved-courses?user_id=${userId}`)
+                .then(res => res.json())
+                .then(data => {
+                    const list = data.approved_courses || [];
+                    if (list.length === 0) {
+                        alert("🔒 እስካሁን Approved የተደረገ ኮርስ የለዎትም።\n\nበእያንዳንዱ ኮርስ 3 ነጻ ጥያቄዎች ይጠቀሙ ወይም ክፍያ አስፈጽመው ያስጸድቁ።");
+                    } else {
+                        alert("✅ Approved የተደረጉልዎ ኮርሶች:\n\n• " + list.join("\n• "));
+                    }
+                })
+                .catch(() => alert("⚠️ መረጃ ማምጣት አልተቻለም።"));
         }
 
         function showDocsDeptMenu() {
@@ -303,12 +329,24 @@ MINI_APP_HTML = """
             document.getElementById('freshman-social-view').classList.remove('hidden');
         }
 
+        function updateApprovedBanner(approvedList) {
+            const banner = document.getElementById('approved-courses-banner');
+            if (approvedList && approvedList.length > 0) {
+                banner.classList.remove('hidden');
+                banner.innerHTML = `✅ <b>የጸደቁልዎ ኮርሶች:</b><br>• ${approvedList.join('<br>• ')}`;
+            } else {
+                banner.classList.add('hidden');
+                banner.innerHTML = '';
+            }
+        }
+
         function startExam(subj, yearMonth) {
             selectedSubject = subj;
             currentYear = yearMonth;
             fetch(`/api/questions?subject=${encodeURIComponent(subj)}&year=${encodeURIComponent(yearMonth)}&user_id=${userId}`)
                 .then(res => res.json())
                 .then(data => {
+                    updateApprovedBanner(data.approved_courses || []);
                     if (data.locked) {
                         hideAllViews();
                         document.getElementById('payment-view').classList.remove('hidden');
@@ -452,6 +490,19 @@ def get_dept_doc_url(dept_code: str) -> str:
     return DOCS_CHANNEL_URL
 
 
+def get_user_approved_courses(conn, user_id: int) -> list:
+    cur = conn.cursor()
+    cur.execute("SELECT payment_status, paid_department FROM users WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    if not row:
+        return []
+    status = (row[0] or "free").strip().lower()
+    raw_depts = row[1] or ""
+    if status != "paid" or not raw_depts.strip():
+        return []
+    return sorted({x.strip() for x in raw_depts.split(",") if x.strip()})
+
+
 def init_documents_table():
     conn = get_conn()
     try:
@@ -543,6 +594,20 @@ def webapp():
     return render_template_string(MINI_APP_HTML)
 
 
+@app.route("/api/approved-courses")
+def api_approved_courses():
+    try:
+        user_id = int(request.args.get("user_id", 0))
+    except ValueError:
+        user_id = 0
+    conn = get_conn()
+    try:
+        approved = get_user_approved_courses(conn, user_id)
+        return jsonify({"user_id": user_id, "approved_courses": approved})
+    finally:
+        conn.close()
+
+
 @app.route("/api/documents")
 def api_documents():
     init_documents_table()
@@ -588,6 +653,7 @@ def api_questions():
     conn = get_conn()
     try:
         is_paid = check_user_paid_for_topic(conn, user_id, subj, year)
+        approved_list = get_user_approved_courses(conn, user_id)
         rows = get_questions_for_pair(conn, subj, year)
         if not rows:
             cur = conn.cursor()
@@ -603,7 +669,12 @@ def api_questions():
             rows = cur.fetchall()
 
         if not rows:
-            return jsonify({"locked": False, "is_paid": is_paid, "questions": []})
+            return jsonify({
+                "locked": False,
+                "is_paid": is_paid,
+                "approved_courses": approved_list,
+                "questions": [],
+            })
 
         selected_rows = rows if is_paid else rows[:3]
 
@@ -620,7 +691,13 @@ def api_questions():
             }
             for r in selected_rows
         ]
-        return jsonify({"locked": False, "is_paid": is_paid, "total_available": len(rows), "questions": questions})
+        return jsonify({
+            "locked": False,
+            "is_paid": is_paid,
+            "approved_courses": approved_list,
+            "total_available": len(rows),
+            "questions": questions,
+        })
     finally:
         conn.close()
 
@@ -735,6 +812,12 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
     )
     builder.row(
         types.InlineKeyboardButton(
+            text="✅ የጸደቁልኝ ኮርሶች >" if user_lang == "am" else "✅ Approved Courses >",
+            callback_data="my_approved_courses",
+        )
+    )
+    builder.row(
+        types.InlineKeyboardButton(
             text="📄 ሰነዶች (ማቴሪያሎች) >" if user_lang == "am" else "📄 Documents >",
             callback_data="tutorial_package",
         )
@@ -776,6 +859,66 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await show_main_menu(message, message.from_user.id, message.from_user.first_name, edit=False)
+
+
+@dp.message(Command("mycourses"))
+async def cmd_my_courses(message: types.Message):
+    conn = get_conn()
+    try:
+        approved = get_user_approved_courses(conn, message.from_user.id)
+    finally:
+        conn.close()
+
+    if not approved:
+        await message.answer(
+            "🔒 **የጸደቁልዎ ኮርሶች:**\n\nእስካሁን Approved የተደረገ ኮርስ የለዎትም። በእያንዳንዱ ኮርስ 3 ነጻ ጥያቄዎች መሞከር ይችላሉ።",
+            parse_mode="Markdown",
+        )
+    else:
+        lines = ["✅ **Approved የተደረጉልዎ ኮርሶች:**\n"] + [f"• **{c}**" for c in approved]
+        await message.answer("\n".join(lines), parse_mode="Markdown")
+
+
+@dp.message(Command("approved"))
+async def cmd_admin_check_approved(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("⚠️ ይህ ትዕዛዝ ለአድሚኑ ብቻ ነው።")
+        return
+    parts = message.text.strip().split()
+    if len(parts) < 2 or not parts[1].isdigit():
+        await message.answer("📌 አጠቃቀም: `/approved <user_id>`", parse_mode="Markdown")
+        return
+    target_id = int(parts[1])
+    conn = get_conn()
+    try:
+        approved = get_user_approved_courses(conn, target_id)
+    finally:
+        conn.close()
+
+    if not approved:
+        await message.answer(f"ℹ️ ለተጠቃሚ `{target_id}` እስካሁን Approved የተደረገ ኮርስ የለም።", parse_mode="Markdown")
+    else:
+        lines = [f"✅ **ለተጠቃሚ `{target_id}` Approved የተደረጉ ኮርሶች:**\n"] + [f"• **{c}**" for c in approved]
+        await message.answer("\n".join(lines), parse_mode="Markdown")
+
+
+@dp.callback_query(F.data == "my_approved_courses")
+async def show_my_approved_courses(callback: types.CallbackQuery):
+    await callback.answer()
+    conn = get_conn()
+    try:
+        approved = get_user_approved_courses(conn, callback.from_user.id)
+    finally:
+        conn.close()
+
+    if not approved:
+        text = "✅ **የጸደቁልኝ ኮርሶች (Approved Courses)**\n\nእስካሁን Approved የተደረገ ኮርስ የለዎትም።"
+    else:
+        text = "✅ **Approved የተደረጉልዎ ኮርሶች:**\n\n" + "\n".join(f"• **{c}**" for c in approved)
+
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="🏠 ዋና ማውጫ", callback_data="back_menu"))
+    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
 @dp.message(Command("adddoc"))
@@ -1126,11 +1269,16 @@ async def info_menus(callback: types.CallbackQuery):
     await callback.message.edit_text(texts[callback.data], reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: str):
+async def send_payment_prompt(message: types.Message, dept_name: str, pay_key: str, approved_courses: list = None):
+    approved_line = ""
+    if approved_courses:
+        approved_line = "\n✅ **ቀድሞ Approved የተደረጉልዎ ኮርሶች:**\n" + "\n".join(f"• {c}" for c in approved_courses) + "\n"
+
     pay_text = (
         f"🔒 **የመጀመሪያዎቹን 3 ነጻ ጥያቄዎች ጨርሰዋል!**\n\n"
         f"🎓 ለ **{dept_name}** ተጨማሪ ጥያቄዎች ክፍያ መፈጸም አለብዎት።\n"
-        f"💰 **ክፍያው 100 Birr ብቻ ነው!**\n\n"
+        f"💰 **ክፍያው 100 Birr ብቻ ነው!**\n"
+        f"{approved_line}\n"
         f"🏦 **CBE:** `1000268717823` (ነጋሽ ወንዴ)\n"
         f"📱 **Telebirr:** `0919245693` (ነጋሽ ወንዴ)\n\n"
         f"📸 ክፍያ ከፈጸሙ በኋላ ስክሪንሾቱን ወደዚህ ቦት ይላኩ!"
@@ -1158,9 +1306,11 @@ async def handle_payment_screenshot(message: types.Message):
         cur = conn.cursor()
         cur.execute("SELECT department FROM users WHERE user_id = ?", (user_id,))
         res = cur.fetchone()
+        existing_approved = get_user_approved_courses(conn, user_id)
     finally:
         conn.close()
     student_dept = res[0] if res else "Unknown"
+    existing_str = ", ".join(existing_approved) if existing_approved else "None"
 
     await message.answer("📥 **የክፍያ ስክሪንሾትዎ ደርሷል!** አድሚኑ እስኪያረጋግጠው ይጠብቁ።", parse_mode="Markdown")
 
@@ -1216,7 +1366,9 @@ async def handle_payment_screenshot(message: types.Message):
         f"🔔 አዲስ ክፍያ መጥቷል! (100 Birr)\n\n"
         f"👤 ስም: {user_name}\n"
         f"🎯 ዲፓርትመንት: {student_dept}\n"
-        f"🆔 ID: {user_id}"
+        f"🆔 ID: {user_id}\n"
+        f"✅ ቀድሞ የጸደቀ: {existing_str}\n"
+        f"☑️ የተመረጡ (አሁን): None"
     )
     await bot.send_photo(chat_id=ADMIN_ID, photo=photo_id, caption=admin_caption, reply_markup=builder.as_markup())
 
@@ -1235,10 +1387,21 @@ async def admin_toggle_selection(callback: types.CallbackQuery):
     admin_selections.setdefault(target_user_id, set())
     if full_key in admin_selections[target_user_id]:
         admin_selections[target_user_id].remove(full_key)
-        await callback.answer(f"❌ {full_key} ተሰርዟል")
+        status_note = f"❌ {full_key} ተሰርዟል"
     else:
         admin_selections[target_user_id].add(full_key)
-        await callback.answer(f"✅ {full_key} ተመርጧል")
+        status_note = f"✅ {full_key} ተመርጧል"
+
+    selected_now = sorted(admin_selections[target_user_id])
+    selected_display = ", ".join(selected_now) if selected_now else "None"
+    base_cap = (callback.message.caption or "").split("\n☑️ የተመረጡ (አሁን):")[0]
+    new_cap = f"{base_cap}\n☑️ የተመረጡ (አሁን): {selected_display}"
+
+    try:
+        await callback.message.edit_caption(caption=new_cap, reply_markup=callback.message.reply_markup)
+    except Exception:
+        pass
+    await callback.answer(status_note)
 
 
 @dp.callback_query(F.data.startswith("fapp_"))
@@ -1258,8 +1421,8 @@ async def admin_finalize_approve(callback: types.CallbackQuery):
         cur.execute("SELECT paid_department FROM users WHERE user_id = ?", (target_user_id,))
         res = cur.fetchone()
         existing_depts = res[0].split(",") if res and res[0] else []
-        combined_depts = set(filter(None, existing_depts)).union(selected_keys)
-        new_paid_str = ",".join(sorted(combined_depts))
+        combined_depts = sorted(set(filter(None, existing_depts)).union(selected_keys))
+        new_paid_str = ",".join(combined_depts)
         cur.execute(
             """
             INSERT INTO users (user_id, payment_status, paid_department)
@@ -1275,17 +1438,30 @@ async def admin_finalize_approve(callback: types.CallbackQuery):
         conn.close()
 
     admin_selections.pop(target_user_id, None)
+    newly_approved_str = ", ".join(sorted(selected_keys))
+    all_approved_str = ", ".join(combined_depts)
+
     await callback.message.edit_caption(
-        caption=(callback.message.caption or "") + f"\n\n✅ [APPROVED: {', '.join(sorted(selected_keys))}]",
+        caption=(callback.message.caption or "")
+        + f"\n\n✅ [APPROVED NOW: {newly_approved_str}]\n📋 [ALL APPROVED FOR USER: {all_approved_str}]",
         reply_markup=None,
     )
     await callback.answer("ክፍያው ጸድቋል!")
     try:
         builder = InlineKeyboardBuilder()
+        builder.row(types.InlineKeyboardButton(text="✅ የጸደቁልኝ ኮርሶች", callback_data="my_approved_courses"))
         builder.row(types.InlineKeyboardButton(text="🏠 ዋና ማውጫ", callback_data="back_menu"))
+        student_msg = (
+            "🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)።\n\n"
+            "✅ **አሁን የተከፈቱልዎ ኮርሶች:**\n"
+            + "\n".join(f"• **{c}**" for c in sorted(selected_keys))
+            + "\n\n📋 **በጠቅላላ Approved የተደረጉልዎ ኮርሶች:**\n"
+            + "\n".join(f"• **{c}**" for c in combined_depts)
+            + "\n\nበሚኒ አፕም ሆነ በቦቱ ሙሉ ጥያቄዎች ተከፍተውልዎታል! 🚀"
+        )
         await bot.send_message(
             target_user_id,
-            "🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)። በሚኒ አፕም ሆነ በቦቱ ሙሉ ጥያቄዎች ተከፍተውልዎታል! 🚀",
+            student_msg,
             reply_markup=builder.as_markup(),
             parse_mode="Markdown",
         )
@@ -1326,8 +1502,9 @@ async def start_specific_exam(callback: types.CallbackQuery):
     conn = get_conn()
     try:
         is_paid_for_this = check_user_paid_for_topic(conn, user_id, subj, topic)
+        approved_list = get_user_approved_courses(conn, user_id)
         if not is_paid_for_this and offset_val >= 3:
-            await send_payment_prompt(callback.message, f"{subj} ({topic})", pay_key)
+            await send_payment_prompt(callback.message, f"{subj} ({topic})", pay_key, approved_list)
             return
 
         rows = get_questions_for_pair(conn, subj, topic)
