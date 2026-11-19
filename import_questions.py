@@ -130,6 +130,16 @@ def init_db():
             )
         """)
         cur.execute("""
+            CREATE TABLE IF NOT EXISTS documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                department TEXT DEFAULT 'ALL',
+                title TEXT NOT NULL,
+                file_id TEXT DEFAULT '',
+                file_name TEXT DEFAULT '',
+                url TEXT DEFAULT ''
+            )
+        """)
+        cur.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS idx_questions_unique
             ON questions(subject, exam_year, question_text)
         """)

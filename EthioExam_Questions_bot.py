@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import sqlite3
 from threading import Thread
 
 from aiogram import Bot, Dispatcher, F, types
@@ -13,6 +12,7 @@ from import_questions import get_conn, load_all_exam_datasets
 
 app = Flask(__name__)
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://ethio-exam-bot-882d.onrender.com/webapp")
+DOCS_CHANNEL_URL = os.environ.get("DOCS_CHANNEL_URL", "https://t.me/NegashComputerTips/264")
 
 MINI_APP_HTML = """
 <!DOCTYPE html>
@@ -33,7 +33,7 @@ MINI_APP_HTML = """
         }
         h1 { color: #38bdf8; font-size: 22px; margin-bottom: 5px; }
         .card {
-            background: rgba(30, 41, 59, 0.9);
+            background: rgba(30, 41, 59, 0.92);
             padding: 15px;
             border-radius: 12px;
             margin-top: 15px;
@@ -55,7 +55,7 @@ MINI_APP_HTML = """
             font-weight: bold;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
-        .btn:hover { opacity: 0.9; }
+        .btn:hover { opacity: 0.92; }
         .opt-btn {
             background-color: #334155;
             color: white;
@@ -69,10 +69,33 @@ MINI_APP_HTML = """
             text-align: left;
         }
         .opt-btn:hover { background-color: #475569; }
-        .correct { background-color: #16a34a !important; }
-        .incorrect { background-color: #dc2626 !important; }
+        .correct { background-color: #16a34a !important; border-color: #22c55e !important; }
+        .incorrect { background-color: #dc2626 !important; border-color: #ef4444 !important; }
         .hidden { display: none; }
         .info-box { font-size: 14px; color: #93c5fd; margin-bottom: 10px; line-height: 1.4; }
+        .badge-free {
+            display: inline-block;
+            background: #0f766e;
+            color: #ccfbf1;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            margin-left: 6px;
+        }
+        .badge-vip {
+            display: inline-block;
+            background: #b45309;
+            color: #fef3c7;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            margin-left: 6px;
+        }
+        a.doc-link {
+            color: #38bdf8;
+            word-break: break-all;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -80,16 +103,27 @@ MINI_APP_HTML = """
     <p id="user-greeting" style="color: #cbd5e1; font-size: 14px;">ሰላም!</p>
 
     <div id="menu-view" class="card">
-        <div class="info-box">👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ:</div>
+        <div class="info-box">👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ (በእያንዳንዱ ኮርስ 3 ነጻ ጥያቄዎች):</div>
         <button class="btn" onclick="showSubMenu('CS')">💻 Computer Science Exit Exam</button>
         <button class="btn" onclick="showSubMenu('IT')">📚 Information Technology Exit Exam</button>
         <button class="btn" onclick="showFreshmanMenu()">📚 Freshman Program (Natural)</button>
         <button class="btn" onclick="showSocialFreshmanMenu()">📚 Freshman Program (Social)</button>
         <button class="btn" onclick="alert('📖 Remedial program exams and materials will be updated soon!')">📖 Remedial Program</button>
         <button class="btn" onclick="alert('📊 የርስዎን ውጤት ለማየት ዋናውን የቴሌግራም ቦት ይጠቀሙ።')">📊 የእኔ ውጤት (My Progress)</button>
-        <button class="btn" onclick="alert('📄 የሰነዶች ማቴሪያሎች በቦቱ ውስጥ በሚገኘው ሊንክ ማውረድ ይችላሉ።')">📄 ሰነዶች (ማቴሪያሎች)</button>
+        <button class="btn" onclick="showDocsView()">📄 ሰነዶች (ማቴሪያሎች)</button>
         <button class="btn" onclick="alert('ℹ️ WankExamBot ለሁሉም የዩኒቨርሲቲ ተማሪዎች የተዘጋጀ የዝግጅት ረዳት ነው።')">ℹ️ ስለ ቦቱ (About Bot)</button>
         <button class="btn" onclick="alert('🎧 እርዳታ ለማግኘት በስልክ ቁጥር 0919245693 ወይም @neguRoha ያግኙን።')">🎧 እርዳታ እና ድጋፍ (Support)</button>
+    </div>
+
+    <div id="docs-view" class="card hidden">
+        <h3 style="color: #38bdf8;">📄 ሰነዶች እና ማቴሪያሎች</h3>
+        <div class="info-box">
+            ለሁሉም ዲፓርትመንቶች የተዘጋጁ የExit Exam እና Freshman ማስታወሻዎችና ሰነዶች እዚህ ይገኛሉ:<br><br>
+            🔗 ዋና ማቴሪያል ሊንክ:<br>
+            <a class="doc-link" href="https://t.me/NegashComputerTips/264" target="_blank">https://t.me/NegashComputerTips/264</a>
+        </div>
+        <div id="docs-list" style="font-size: 13px; color: #e2e8f0; margin-bottom: 12px;"></div>
+        <button class="btn" onclick="backToMenu()" style="background: #475569; text-align: center;">🏠 ዋና ማውጫ (Main Menu)</button>
     </div>
 
     <div id="submenu-view" class="card hidden">
@@ -127,8 +161,11 @@ MINI_APP_HTML = """
     </div>
 
     <div id="exam-view" class="card hidden">
-        <h3 id="q-title" style="color: #38bdf8;">ጥያቄ</h3>
-        <p id="q-text" style="font-size: 15px; line-height: 1.5;"></p>
+        <div id="q-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+            <h3 id="q-title" style="color: #38bdf8; margin:0;">ጥያቄ</h3>
+            <span id="q-badge"></span>
+        </div>
+        <p id="q-text" style="font-size: 15px; line-height: 1.5; margin-top:12px;"></p>
 
         <button class="opt-btn" id="btn-a" onclick="submitAnswer('A')"></button>
         <button class="opt-btn" id="btn-b" onclick="submitAnswer('B')"></button>
@@ -143,12 +180,13 @@ MINI_APP_HTML = """
     <div id="payment-view" class="card hidden" style="text-align: center;">
         <h2 style="color: #f87171;">🔒 የመጀመሪያዎቹን 3 ነጻ ጥያቄዎች ጨርሰዋል!</h2>
         <p style="font-size: 14px; line-height: 1.6; text-align: left; background: #1e293b; padding: 12px; border-radius: 8px;">
-            🎓 ተጨማሪ ጥያቄዎችን ለመፈተን ክፍያ መፈጸም አለብዎት።<br>
+            🎓 ለዚህ ኮርስ <b>ሙሉ ጥያቄዎችን (Full Questions)</b> ለመፈተን ክፍያ መፈጸም አለብዎት።<br>
             💰 <b>ክፍያው 100 Birr ብቻ ነው!</b><br><br>
             🏦 <b>CBE:</b> <code>1000268717823</code> (ነጋሽ ወንዴ)<br>
             📱 <b>Telebirr:</b> <code>0919245693</code> (ነጋሽ ወንዴ)<br><br>
-            📸 <b>ክፍያ ከፈጸሙ በኋላ ስክሪንሾቱን ወደ ቴሌግራም ቦቱ ይላኩ!</b>
+            📸 <b>ክፍያ ከፈጸሙ በኋላ ስክሪንሾቱን በቀጥታ ወደ ቴሌግራም ቦቱ ይላኩ! አድሚኑ ሲያጸድቅልዎ ሙሉ ጥያቄዎች ይከፈታሉ።</b>
         </p>
+        <button class="btn" onclick="startExam(selectedSubject, currentYear)" style="background: #059669; text-align: center;">🔄 ክፍያ ጸድቋል? እንደገና ሞክር</button>
         <button class="btn" onclick="backToMenu()" style="text-align: center;">🏠 ዋና ማውጫ ተመለስ</button>
     </div>
 
@@ -173,21 +211,50 @@ MINI_APP_HTML = """
         let questionsList = [];
         let currentIndex = 0;
         let score = 0;
+        let isPaidUser = false;
+        const FREE_LIMIT = 3;
+
+        function hideAllViews() {
+            ['menu-view', 'docs-view', 'submenu-view', 'freshman-view', 'freshman-social-view', 'exam-view', 'payment-view', 'result-view']
+                .forEach(id => document.getElementById(id).classList.add('hidden'));
+        }
+
+        function showDocsView() {
+            hideAllViews();
+            document.getElementById('docs-view').classList.remove('hidden');
+            fetch('/api/documents')
+                .then(res => res.json())
+                .then(data => {
+                    const listEl = document.getElementById('docs-list');
+                    const docs = data.documents || [];
+                    if (docs.length === 0) {
+                        listEl.innerHTML = '<div>📌 ተጨማሪ ሰነዶች ሲታከሉ እዚህ ይታያሉ።</div>';
+                        return;
+                    }
+                    listEl.innerHTML = docs.map(d =>
+                        `<div style="background:#1e293b;padding:8px;border-radius:6px;margin-bottom:6px;">
+                            <b>${d.title}</b> (${d.department})<br>
+                            ${d.url ? `<a class="doc-link" href="${d.url}" target="_blank">${d.url}</a>` : `<span>File: ${d.file_name}</span>`}
+                        </div>`
+                    ).join('');
+                })
+                .catch(() => {});
+        }
 
         function showSubMenu(subj) {
             selectedSubject = subj;
-            document.getElementById('menu-view').classList.add('hidden');
+            hideAllViews();
             document.getElementById('submenu-title').innerText = `${subj === 'CS' ? 'Computer Science' : 'Information Technology'} Exit Exam\nSelect exam year and month:`;
             document.getElementById('submenu-view').classList.remove('hidden');
         }
 
         function showFreshmanMenu() {
-            document.getElementById('menu-view').classList.add('hidden');
+            hideAllViews();
             document.getElementById('freshman-view').classList.remove('hidden');
         }
 
         function showSocialFreshmanMenu() {
-            document.getElementById('menu-view').classList.add('hidden');
+            hideAllViews();
             document.getElementById('freshman-social-view').classList.remove('hidden');
         }
 
@@ -198,37 +265,45 @@ MINI_APP_HTML = """
                 .then(res => res.json())
                 .then(data => {
                     if (data.locked) {
-                        document.getElementById('submenu-view').classList.add('hidden');
-                        document.getElementById('freshman-view').classList.add('hidden');
-                        document.getElementById('freshman-social-view').classList.add('hidden');
+                        hideAllViews();
                         document.getElementById('payment-view').classList.remove('hidden');
                         return;
                     }
-                    questionsList = data.questions;
-                    if (!questionsList || questionsList.length === 0) {
+                    questionsList = data.questions || [];
+                    isPaidUser = Boolean(data.is_paid);
+                    if (questionsList.length === 0) {
                         alert("⚠️ በዚህ ምድብ ጥያቄዎች አልተገኙም!");
                         return;
                     }
                     currentIndex = 0;
                     score = 0;
-                    document.getElementById('submenu-view').classList.add('hidden');
-                    document.getElementById('freshman-view').classList.add('hidden');
-                    document.getElementById('freshman-social-view').classList.add('hidden');
+                    hideAllViews();
                     document.getElementById('exam-view').classList.remove('hidden');
                     showQuestion();
                 });
         }
 
         function showQuestion() {
+            if (!isPaidUser && currentIndex >= FREE_LIMIT) {
+                hideAllViews();
+                document.getElementById('payment-view').classList.remove('hidden');
+                return;
+            }
+
             if (currentIndex >= questionsList.length) {
-                document.getElementById('exam-view').classList.add('hidden');
+                hideAllViews();
                 document.getElementById('result-view').classList.remove('hidden');
-                document.getElementById('final-score').innerText = `📊 ትክክለኛ መልሶች: ${score} ከ ${questionsList.length}`;
+                const pct = Math.round((score / questionsList.length) * 100);
+                document.getElementById('final-score').innerText = `📊 ትክክለኛ መልሶች: ${score} ከ ${questionsList.length} (${pct}%)`;
                 return;
             }
 
             let q = questionsList[currentIndex];
-            document.getElementById('q-title').innerText = `📝 ጥያቄ ቁጥር ${currentIndex + 1}`;
+            document.getElementById('q-title').innerText = `📝 ጥያቄ ${currentIndex + 1} / ${questionsList.length}`;
+            document.getElementById('q-badge').innerHTML = isPaidUser
+                ? `<span class="badge-vip">VIP ሙሉ ፈተና</span>`
+                : `<span class="badge-free">ነጻ (${FREE_LIMIT - currentIndex} ቀርቷል)</span>`;
+
             document.getElementById('q-text').innerText = q.question_text;
 
             document.getElementById('btn-a').innerText = `A) ${q.option_a}`;
@@ -260,13 +335,14 @@ MINI_APP_HTML = """
                     question_id: q.id,
                     selected: selectedOpt,
                     subject: selectedSubject,
-                    year: currentYear
+                    year: currentYear,
+                    step_index: currentIndex
                 })
             })
             .then(res => res.json())
             .then(data => {
                 if (data.locked) {
-                    document.getElementById('exam-view').classList.add('hidden');
+                    hideAllViews();
                     document.getElementById('payment-view').classList.remove('hidden');
                     return;
                 }
@@ -288,12 +364,7 @@ MINI_APP_HTML = """
         }
 
         function backToMenu() {
-            document.getElementById('exam-view').classList.add('hidden');
-            document.getElementById('payment-view').classList.add('hidden');
-            document.getElementById('result-view').classList.add('hidden');
-            document.getElementById('submenu-view').classList.add('hidden');
-            document.getElementById('freshman-view').classList.add('hidden');
-            document.getElementById('freshman-social-view').classList.add('hidden');
+            hideAllViews();
             document.getElementById('menu-view').classList.remove('hidden');
         }
     </script>
@@ -301,7 +372,6 @@ MINI_APP_HTML = """
 </html>
 """
 
-# አጭር ኮዶች (64-byte callback_data limit እንዳይጣስ)
 TOPIC_KEYS = {
     "cs17t": ("CS", "2017 ጥር"),
     "cs17s": ("CS", "2017 ሰኔ"),
@@ -328,6 +398,48 @@ TOPIC_KEYS = {
 }
 
 KEY_BY_PAIR = {v: k for k, v in TOPIC_KEYS.items()}
+
+
+def init_documents_table():
+    conn = get_conn()
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                department TEXT DEFAULT 'ALL',
+                title TEXT NOT NULL,
+                file_id TEXT DEFAULT '',
+                file_name TEXT DEFAULT '',
+                url TEXT DEFAULT ''
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def check_user_paid_for_topic(conn, user_id: int, subj: str, year: str) -> bool:
+    cur = conn.cursor()
+    cur.execute("SELECT payment_status, paid_department FROM users WHERE user_id = ?", (user_id,))
+    user_data = cur.fetchone()
+    if not user_data:
+        return False
+    pay_status = (user_data[0] or "free").strip().lower()
+    paid_depts = user_data[1] or ""
+    if pay_status != "paid":
+        return False
+
+    paid_set = {x.strip() for x in paid_depts.split(",") if x.strip()}
+    pay_key = f"{subj}_{year}"
+    t_code = KEY_BY_PAIR.get((subj, year), "")
+    return (
+        pay_key in paid_set
+        or (t_code and t_code in paid_set)
+        or subj in paid_set
+        or "ALL" in paid_set
+    )
 
 
 def get_questions_for_pair(conn, subj: str, topic: str):
@@ -379,6 +491,23 @@ def webapp():
     return render_template_string(MINI_APP_HTML)
 
 
+@app.route("/api/documents")
+def api_documents():
+    init_documents_table()
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT id, department, title, file_name, url FROM documents ORDER BY id DESC LIMIT 20"
+        ).fetchall()
+        docs = [
+            {"id": r[0], "department": r[1], "title": r[2], "file_name": r[3], "url": r[4]}
+            for r in rows
+        ]
+        return jsonify({"channel_url": DOCS_CHANNEL_URL, "documents": docs})
+    finally:
+        conn.close()
+
+
 @app.route("/api/questions")
 def api_questions():
     subj = request.args.get("subject", "CS").strip()
@@ -390,19 +519,10 @@ def api_questions():
 
     conn = get_conn()
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT payment_status, paid_department FROM users WHERE user_id = ?", (user_id,))
-        user_data = cur.fetchone()
-
-        pay_status = user_data[0] if user_data else "free"
-        paid_depts = user_data[1] if user_data and user_data[1] else ""
-        pay_key = f"{subj}_{year}"
-        t_code = KEY_BY_PAIR.get((subj, year), "")
-        paid_set = {x.strip() for x in paid_depts.split(",") if x.strip()}
-        is_paid = pay_status == "paid" and (pay_key in paid_set or (t_code and t_code in paid_set))
-
+        is_paid = check_user_paid_for_topic(conn, user_id, subj, year)
         rows = get_questions_for_pair(conn, subj, year)
         if not rows:
+            cur = conn.cursor()
             cur.execute(
                 """
                 SELECT id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation
@@ -414,10 +534,10 @@ def api_questions():
             )
             rows = cur.fetchall()
 
-        if not is_paid:
-            rows = rows[:3]
-            if not rows:
-                return jsonify({"locked": True, "questions": []})
+        if not rows:
+            return jsonify({"locked": False, "is_paid": is_paid, "questions": []})
+
+        selected_rows = rows if is_paid else rows[:3]
 
         questions = [
             {
@@ -430,9 +550,9 @@ def api_questions():
                 "correct_answer": r[6],
                 "explanation": r[7],
             }
-            for r in rows
+            for r in selected_rows
         ]
-        return jsonify({"locked": False, "questions": questions})
+        return jsonify({"locked": False, "is_paid": is_paid, "total_available": len(rows), "questions": questions})
     finally:
         conn.close()
 
@@ -442,9 +562,20 @@ def api_answer():
     data = request.get_json(silent=True) or {}
     q_id = data.get("question_id")
     selected = data.get("selected")
+    subj = (data.get("subject") or "CS").strip()
+    year = (data.get("year") or "").strip()
+    step_index = int(data.get("step_index") or 0)
+    try:
+        user_id = int(data.get("user_id") or 0)
+    except ValueError:
+        user_id = 0
 
     conn = get_conn()
     try:
+        is_paid = check_user_paid_for_topic(conn, user_id, subj, year)
+        if not is_paid and step_index >= 3:
+            return jsonify({"locked": True, "is_correct": False, "correct_answer": "A"})
+
         cur = conn.cursor()
         cur.execute("SELECT correct_answer FROM questions WHERE id = ?", (q_id,))
         res = cur.fetchone()
@@ -577,6 +708,59 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await show_main_menu(message, message.from_user.id, message.from_user.first_name, edit=False)
+
+
+@dp.message(Command("adddoc"))
+async def cmd_add_doc(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("⚠️ ይህ ትዕዛዝ ለአድሚኑ ብቻ ነው።")
+        return
+    raw_args = message.text.replace("/adddoc", "", 1).strip()
+    parts = [p.strip() for p in raw_args.split("|")]
+    title = parts[0] if len(parts) >= 1 and parts[0] else "Exit Exam & Freshman Material"
+    url = parts[1] if len(parts) >= 2 and parts[1] else DOCS_CHANNEL_URL
+    dept = parts[2] if len(parts) >= 3 and parts[2] else "ALL"
+
+    init_documents_table()
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO documents (department, title, file_id, file_name, url) VALUES (?, ?, '', '', ?)",
+            (dept, title, url),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    await message.answer(
+        f"✅ ሰነዱ ተመዝግቧል!\n• ርዕስ: **{title}**\n• ዲፓርትመንት: **{dept}**\n• ሊንክ: {url}",
+        parse_mode="Markdown",
+    )
+
+
+@dp.message(F.document)
+async def handle_admin_document_upload(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("📄 ሰነዶችን ለማየት ከዋና ማውጫ **ሰነዶች (ማቴሪያሎች)** የሚለውን ይጫኑ።")
+        return
+
+    doc = message.document
+    title = (message.caption or doc.file_name or "Study Material").strip()
+    init_documents_table()
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO documents (department, title, file_id, file_name, url) VALUES (?, ?, ?, ?, ?)",
+            ("ALL", title, doc.file_id, doc.file_name or "", DOCS_CHANNEL_URL),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    await message.answer(
+        f"✅ ሰነዱ ለሁሉም ዲፓርትመንት ተመዝግቧል!\n• ፋይል: `{doc.file_name}`\n• ርዕስ: **{title}**",
+        parse_mode="Markdown",
+    )
 
 
 @dp.callback_query(F.data == "back_menu")
@@ -783,11 +967,47 @@ async def show_my_bookmarks(callback: types.CallbackQuery):
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
 
 
-@dp.callback_query(F.data.in_({"tutorial_package", "about_bot", "help_menu"}))
+@dp.callback_query(F.data == "tutorial_package")
+async def tutorial_package_menu(callback: types.CallbackQuery):
+    await callback.answer()
+    init_documents_table()
+    conn = get_conn()
+    try:
+        docs = conn.execute(
+            "SELECT title, file_id, url FROM documents ORDER BY id DESC LIMIT 10"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    lines = [
+        "📄 **ሰነዶች እና ማቴሪያሎች**\n",
+        f"🔗 **የExit Exam እና Freshman ሰነዶች ሊንክ:**\n{DOCS_CHANNEL_URL}\n",
+    ]
+    if docs:
+        lines.append("📚 **የተጨመሩ ሰነዶች:**")
+        for title, _, url in docs:
+            link_part = f" — {url}" if url else ""
+            lines.append(f"• **{title}**{link_part}")
+    else:
+        lines.append("የExit Exam እና Freshman ማስታወሻዎች ከላይ ባለው ሊንክ ይገኛሉ።")
+
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="📂 ማቴሪያሎችን ክፈት", url=DOCS_CHANNEL_URL))
+    for title, file_id, _ in docs:
+        if file_id:
+            try:
+                await callback.message.answer_document(document=file_id, caption=f"📄 {title}")
+            except Exception as e:
+                logging.error(f"Send document error: {e}")
+
+    builder.row(types.InlineKeyboardButton(text="🏠 ዋና ማውጫ", callback_data="back_menu"))
+    await callback.message.edit_text("\n".join(lines), reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+@dp.callback_query(F.data.in_({"about_bot", "help_menu"}))
 async def info_menus(callback: types.CallbackQuery):
     await callback.answer()
     texts = {
-        "tutorial_package": "📄 **ሰነዶች እና ማቴሪያሎች**\n\nየExit Exam እና Freshman ማስታወሻዎች በቅርቡ እዚህ ይጫናሉ።",
         "about_bot": "ℹ️ **ስለ Wank Exam Bot**\n\nለCS፣ IT እና Freshman ተማሪዎች የተዘጋጀ የልምምድ ቦት እና ሚኒ አፕ ነው።",
         "help_menu": "🎧 **እርዳታ እና ድጋፍ**\n\n📞 ስልክ: `0919245693`\n👤 ቴሌግራም: `@neguRoha`",
     }
@@ -931,8 +1151,14 @@ async def admin_finalize_approve(callback: types.CallbackQuery):
         combined_depts = set(filter(None, existing_depts)).union(selected_keys)
         new_paid_str = ",".join(sorted(combined_depts))
         cur.execute(
-            "UPDATE users SET payment_status = 'paid', paid_department = ? WHERE user_id = ?",
-            (new_paid_str, target_user_id),
+            """
+            INSERT INTO users (user_id, payment_status, paid_department)
+            VALUES (?, 'paid', ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                payment_status = 'paid',
+                paid_department = excluded.paid_department
+            """,
+            (target_user_id, new_paid_str),
         )
         conn.commit()
     finally:
@@ -949,7 +1175,7 @@ async def admin_finalize_approve(callback: types.CallbackQuery):
         builder.row(types.InlineKeyboardButton(text="🏠 ዋና ማውጫ", callback_data="back_menu"))
         await bot.send_message(
             target_user_id,
-            "🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)። ሙሉ ፈተናዎቹ ተከፍተውልዎታል! 🚀",
+            "🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)። በሚኒ አፕም ሆነ በቦቱ ሙሉ ጥያቄዎች ተከፍተውልዎታል! 🚀",
             reply_markup=builder.as_markup(),
             parse_mode="Markdown",
         )
@@ -978,7 +1204,6 @@ async def admin_reject(callback: types.CallbackQuery):
 async def start_specific_exam(callback: types.CallbackQuery):
     await callback.answer()
     user_id = callback.from_user.id
-    # ቅርጸት: q_{t_code}_{offset}_{score} (ምሳሌ: q_cs17t_0_0 ወይም q_fs_ant_1_1)
     raw = callback.data[2:]
     parts = raw.rsplit("_", 2)
     t_code = parts[0]
@@ -990,14 +1215,7 @@ async def start_specific_exam(callback: types.CallbackQuery):
 
     conn = get_conn()
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT payment_status, paid_department FROM users WHERE user_id = ?", (user_id,))
-        user_data = cur.fetchone()
-        pay_status = user_data[0] if user_data else "free"
-        paid_depts = user_data[1] if user_data and user_data[1] else ""
-        paid_set = {x.strip() for x in paid_depts.split(",") if x.strip()}
-        is_paid_for_this = pay_status == "paid" and (pay_key in paid_set or t_code in paid_set)
-
+        is_paid_for_this = check_user_paid_for_topic(conn, user_id, subj, topic)
         if not is_paid_for_this and offset_val >= 3:
             await send_payment_prompt(callback.message, f"{subj} ({topic})", pay_key)
             return
@@ -1049,7 +1267,6 @@ async def start_specific_exam(callback: types.CallbackQuery):
 async def check_answer(callback: types.CallbackQuery):
     await callback.answer()
     user_id = callback.from_user.id
-    # ቅርጸት: a_{t_code}_{offset}_{q_id}_{score}_{chosen_opt}
     raw = callback.data[2:]
     parts = raw.rsplit("_", 4)
     t_code = parts[0]
@@ -1134,8 +1351,8 @@ async def handle_bookmark(callback: types.CallbackQuery):
 
 
 async def main():
-    # ነባር ዲቢውን ሳያጠፋ ጠረጴዛዎችን ያረጋግጣል፣ ያሉ CSV ፋይሎችንም ደህንነቱ በተጠበቀ ሁኔታ ይጨምራል
     load_all_exam_datasets()
+    init_documents_table()
     flask_thread = Thread(target=run_flask, daemon=True)
     flask_thread.start()
     logging.info("🌐 Flask Web Server started")
