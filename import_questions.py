@@ -1,70 +1,15 @@
+import logging
 import os
+import re
 import sqlite3
-import pandas as pd
 from datetime import datetime
+import pandas as pd
 
-DB_NAME = "brand_new_exam.db"
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def backup_database():
-    if not os.path.exists(DB_NAME):
-        return
-    backup_name = f"brand_new_exam_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-    source = sqlite3.connect(DB_NAME)
-    destination = sqlite3.connect(backup_name)
-    try:
-        source.backup(destination)
-    finally:
-        destination.close()
-        source.close()
+DB_PATH = os.environ.get("DB_PATH", "brand_new_exam.db")
+DATA_DIR = os.environ.get("EXAM_DATA_DIR", ".")
 
-def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS questions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                subject TEXT,
-                exam_year TEXT,
-                question_text TEXT,
-                option_a TEXT,
-                option_b TEXT,
-                option_c TEXT,
-                option_d TEXT,
-                correct_answer TEXT,
-                explanation TEXT
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY,
-                department TEXT DEFAULT 'CS',
-                lang TEXT DEFAULT 'am',
-                free_questions_used INTEGER DEFAULT 0,
-                payment_status TEXT DEFAULT 'free',
-                paid_department TEXT DEFAULT ''
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS bookmarks (
-                user_id INTEGER,
-                question_id INTEGER,
-                PRIMARY KEY(user_id, question_id)
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_progress (
-                user_id INTEGER PRIMARY KEY,
-                total_attempted INTEGER DEFAULT 0,
-                correct_count INTEGER DEFAULT 0,
-                wrong_count INTEGER DEFAULT 0
-            )
-        """)
-        conn.commit()
-    finally:
-        conn.close()
-
-# 📌 የቀድሞዎቹ ዳታዎች ሁሉ ሳይነኩ፣ አዳዲስ የ Social Science Freshman ፋይሎች በወቅቱ ተካትተዋል:
 FILES_TO_IMPORT = [
     # Computer Science Exit Exams
     ("CS_2017_Tir_100_Unique_Final.csv", "CS", "2017 ጥር"),
@@ -87,7 +32,7 @@ FILES_TO_IMPORT = [
     ("Inclusiveness_Ch1_Ch2_100_Mid_Exam_Questions.csv", "Freshman", "Inclusiveness"),
     ("Math_Natural_Sciences_Ch1_Ch2_MidExam_100Q.csv", "Freshman", "Math"),
 
-    # 📚 Freshman Program (Social Science) - አዳዲስ የተጫኑ ፋይሎች:
+    # Freshman Program (Social Science)
     ("freshman_direct_download_Anthropology_100_Questions.csv", "Freshman_Social", "Anthropology"),
     ("freshman_direct_download_Geography_of_Ethiopia_100_Questions.csv", "Freshman_Social", "Geography"),
     ("freshman_direct_download_History_of_Ethiopia_and_the_Horn_100_Questions.csv", "Freshman_Social", "History"),
@@ -96,76 +41,203 @@ FILES_TO_IMPORT = [
     ("freshman_direct_download_Global_Trends_100_Questions.csv", "Freshman_Social", "Global_Trends"),
 ]
 
-def load_all_exam_datasets():
-    required_columns = ["question_text", "option_a", "option_b", "option_c", "option_d", "correct_answer", "explanation"]
-    prepared_files = []
 
-    for file_name, subject, exam_year in FILES_TO_IMPORT:
-        if not os.path.exists(file_name):
-            continue
+def get_conn():
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    return conn
+
+
+def normalize_answer(raw_ans: str) -> str:
+    txt = str(raw_ans or "").strip().upper()
+    match = re.search(r"\b([ABCD])\b", txt)
+    if match:
+        return match.group(1)
+    if txt and txt[0] in ("A", "B", "C", "D"):
+        return txt[0]
+    return "A"
+
+
+def backup_database(keep_last: int = 5):
+    if not os.path.exists(DB_PATH):
+        return
+    os.makedirs("backups", exist_ok=True)
+    backup_name = os.path.join(
+        "backups", f"brand_new_exam_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    )
+    src = sqlite3.connect(DB_PATH)
+    dst = sqlite3.connect(backup_name)
+    try:
+        src.backup(dst)
+    finally:
+        dst.close()
+        src.close()
+
+    all_backups = sorted(
+        [os.path.join("backups", f) for f in os.listdir("backups") if f.endswith(".db")],
+        key=os.path.getmtime,
+        reverse=True,
+    )
+    for old_file in all_backups[keep_last:]:
         try:
-            try:
-                df = pd.read_csv(file_name, encoding="utf-8-sig")
-            except UnicodeDecodeError:
-                df = pd.read_csv(file_name, encoding="latin1")
-
-            df.columns = [str(column).strip().lower() for column in df.columns]
-            if 'question' in df.columns and 'question_text' not in df.columns:
-                df = df.rename(columns={'question': 'question_text'})
-            if 'correct_option' in df.columns and 'correct_answer' not in df.columns:
-                df = df.rename(columns={'correct_option': 'correct_answer'})
-
-            missing = [column for column in required_columns if column not in df.columns]
-            if missing:
-                continue
-
-            df = df[required_columns].fillna("")
-            records = []
-            for _, row in df.iterrows():
-                q_text = str(row["question_text"]).strip()
-                if not q_text:
-                    continue
-                records.append((
-                    subject, exam_year, q_text,
-                    str(row["option_a"]).strip(),
-                    str(row["option_b"]).strip(),
-                    str(row["option_c"]).strip(),
-                    str(row["option_d"]).strip(),
-                    str(row["correct_answer"]).strip().upper(),
-                    str(row["explanation"]).strip()
-                ))
-            prepared_files.append((file_name, records))
-        except Exception:
+            os.remove(old_file)
+        except OSError:
             pass
 
-    if not prepared_files:
-        return
 
-    conn = sqlite3.connect(DB_NAME)
+def init_db():
+    conn = get_conn()
     try:
-        conn.execute("BEGIN")
-        for file_name, records in prepared_files:
-            for record in records:
-                # 🛡️ Safe Insert: ነባር ዳታዎችን በፍጹም አያጠፋም፣ ዱፕሊኬትም አያደርግም
-                conn.execute("""
-                    INSERT INTO questions (
-                        subject, exam_year, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation
-                    )
-                    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM questions
-                        WHERE subject = ? AND exam_year = ? AND question_text = ?
-                    )
-                """, record + (record[0], record[1], record[2]))
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS questions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject TEXT NOT NULL,
+                exam_year TEXT NOT NULL,
+                question_text TEXT NOT NULL,
+                option_a TEXT NOT NULL,
+                option_b TEXT NOT NULL,
+                option_c TEXT NOT NULL,
+                option_d TEXT NOT NULL,
+                correct_answer TEXT NOT NULL,
+                explanation TEXT DEFAULT ''
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY,
+                department TEXT DEFAULT 'CS',
+                lang TEXT DEFAULT 'am',
+                free_questions_used INTEGER DEFAULT 0,
+                payment_status TEXT DEFAULT 'free',
+                paid_department TEXT DEFAULT ''
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS bookmarks (
+                user_id INTEGER,
+                question_id INTEGER,
+                PRIMARY KEY(user_id, question_id)
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_progress (
+                user_id INTEGER PRIMARY KEY,
+                total_attempted INTEGER DEFAULT 0,
+                correct_count INTEGER DEFAULT 0,
+                wrong_count INTEGER DEFAULT 0
+            )
+        """)
+        cur.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_questions_unique
+            ON questions(subject, exam_year, question_text)
+        """)
         conn.commit()
-        print("Safe incremental import for Social Science & all datasets completed successfully!")
-    except Exception:
-        conn.rollback()
-        raise
     finally:
         conn.close()
 
+
+def _read_csv_flexible(full_path: str) -> pd.DataFrame:
+    for enc in ("utf-8-sig", "utf-8", "latin1", "cp1252"):
+        try:
+            return pd.read_csv(full_path, encoding=enc)
+        except UnicodeDecodeError:
+            continue
+    return pd.read_csv(full_path, encoding="utf-8", errors="replace")
+
+
+def load_all_exam_datasets(custom_files=None):
+    """
+    ነባር ጥያቄዎችን ሳያጠፋ አዳዲስ ጥያቄዎችን ብቻ (duplicate ያልሆኑትን) ይጨምራል።
+    """
+    init_db()
+    required_cols = [
+        "question_text", "option_a", "option_b", "option_c", "option_d", "correct_answer", "explanation"
+    ]
+    targets = list(FILES_TO_IMPORT)
+    if custom_files:
+        targets.extend(custom_files)
+
+    conn = get_conn()
+    total_added = 0
+    try:
+        for file_name, subject, exam_year in targets:
+            full_path = file_name if os.path.isabs(file_name) else os.path.join(DATA_DIR, file_name)
+            if not os.path.exists(full_path):
+                logging.warning(f"CSV file not found (skipped): {full_path}")
+                continue
+
+            try:
+                df = _read_csv_flexible(full_path)
+                df.columns = [str(c).strip().lower() for c in df.columns]
+
+                rename_map = {}
+                if "question" in df.columns and "question_text" not in df.columns:
+                    rename_map["question"] = "question_text"
+                if "correct_option" in df.columns and "correct_answer" not in df.columns:
+                    rename_map["correct_option"] = "correct_answer"
+                if "answer" in df.columns and "correct_answer" not in df.columns:
+                    rename_map["answer"] = "correct_answer"
+                if rename_map:
+                    df = df.rename(columns=rename_map)
+
+                if "explanation" not in df.columns:
+                    df["explanation"] = ""
+
+                missing = [c for c in required_cols if c not in df.columns]
+                if missing:
+                    logging.error(f"Missing columns {missing} in {file_name}. Found: {list(df.columns)}")
+                    continue
+
+                df = df[required_cols].fillna("")
+                added_for_file = 0
+
+                conn.execute("BEGIN")
+                for _, row in df.iterrows():
+                    q_text = str(row["question_text"]).strip()
+                    if not q_text:
+                        continue
+                    cur = conn.execute(
+                        """
+                        INSERT OR IGNORE INTO questions (
+                            subject, exam_year, question_text,
+                            option_a, option_b, option_c, option_d,
+                            correct_answer, explanation
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            subject,
+                            exam_year,
+                            q_text,
+                            str(row["option_a"]).strip(),
+                            str(row["option_b"]).strip(),
+                            str(row["option_c"]).strip(),
+                            str(row["option_d"]).strip(),
+                            normalize_answer(row["correct_answer"]),
+                            str(row["explanation"]).strip(),
+                        ),
+                    )
+                    if cur.rowcount > 0:
+                        added_for_file += 1
+
+                conn.commit()
+                total_added += added_for_file
+                logging.info(f"[{subject} | {exam_year}] {file_name}: +{added_for_file} new questions added.")
+            except Exception as e:
+                conn.rollback()
+                logging.error(f"Failed importing {file_name}: {e}")
+
+        summary = conn.execute(
+            "SELECT subject, exam_year, COUNT(*) FROM questions GROUP BY subject, exam_year ORDER BY subject, exam_year"
+        ).fetchall()
+        logging.info(f"Import finished. Total newly added in this run: {total_added}")
+        for s, y, cnt in summary:
+            logging.info(f"  -> {s} / {y}: {cnt} questions in DB")
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     backup_database()
-    init_db()
     load_all_exam_datasets()
