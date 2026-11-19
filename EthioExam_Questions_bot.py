@@ -129,11 +129,17 @@ MINI_APP_HTML = """
             margin-bottom: 10px;
             text-align: left;
         }
+        .status-msg {
+            font-size: 13px;
+            color: #fbbf24;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
     <h1>🎓 Wank Exam Portal</h1>
     <p id="user-greeting" style="color: #cbd5e1; font-size: 14px;">ሰላም!</p>
+    <div id="global-status" class="status-msg hidden"></div>
 
     <div id="menu-view" class="card">
         <div class="info-box">👇 ከታች ከሚገኙት አማራጮች ውስጥ የሚፈልጉትን ይምረጡ (በእያንዳንዱ ኮርስ 3 ነጻ ጥያቄዎች):</div>
@@ -243,13 +249,19 @@ MINI_APP_HTML = """
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
+        const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+        if (tg && typeof tg.expand === 'function') {
+            try { tg.expand(); } catch (e) {}
+        }
 
-        const user = tg.initDataUnsafe?.user;
-        let userId = user ? user.id : 12345;
-        if (user) {
-            document.getElementById('user-greeting').innerText = `👋 ሰላም, ${user.first_name}!`;
+        const urlParams = new URLSearchParams(window.location.search);
+        const paramUid = urlParams.get('user_id');
+        const user = tg && tg.initDataUnsafe ? tg.initDataUnsafe.user : null;
+        let userId = user && user.id ? user.id : (paramUid ? parseInt(paramUid, 10) : 12345);
+        if (user && user.first_name) {
+            document.getElementById('user-greeting').innerText = `👋 ሰላም, ${user.first_name}! (ID: ${userId})`;
+        } else {
+            document.getElementById('user-greeting').innerText = `👋 ሰላም! (ID: ${userId})`;
         }
 
         let selectedSubject = '';
@@ -259,6 +271,17 @@ MINI_APP_HTML = """
         let score = 0;
         let isPaidUser = false;
         const FREE_LIMIT = 3;
+
+        function setGlobalStatus(msg) {
+            const el = document.getElementById('global-status');
+            if (!msg) {
+                el.classList.add('hidden');
+                el.innerText = '';
+            } else {
+                el.classList.remove('hidden');
+                el.innerText = msg;
+            }
+        }
 
         function hideAllViews() {
             ['menu-view', 'docs-dept-view', 'docs-view', 'submenu-view', 'freshman-view', 'freshman-social-view', 'exam-view', 'payment-view', 'result-view']
@@ -343,9 +366,15 @@ MINI_APP_HTML = """
         function startExam(subj, yearMonth) {
             selectedSubject = subj;
             currentYear = yearMonth;
+            setGlobalStatus("⏳ ጥያቄዎች በመጫን ላይ ናቸው...");
+
             fetch(`/api/questions?subject=${encodeURIComponent(subj)}&year=${encodeURIComponent(yearMonth)}&user_id=${userId}`)
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
                 .then(data => {
+                    setGlobalStatus("");
                     updateApprovedBanner(data.approved_courses || []);
                     if (data.locked) {
                         hideAllViews();
@@ -355,7 +384,7 @@ MINI_APP_HTML = """
                     questionsList = data.questions || [];
                     isPaidUser = Boolean(data.is_paid);
                     if (questionsList.length === 0) {
-                        alert("⚠️ በዚህ ምድብ ጥያቄዎች አልተገኙም!");
+                        alert("⚠️ በዚህ ምድብ ጥያቄዎች አልተገኙም! እባክዎ የCSV ፋይሎች በዲቢው መጫናቸውን ያረጋግጡ።");
                         return;
                     }
                     currentIndex = 0;
@@ -363,6 +392,10 @@ MINI_APP_HTML = """
                     hideAllViews();
                     document.getElementById('exam-view').classList.remove('hidden');
                     showQuestion();
+                })
+                .catch(err => {
+                    setGlobalStatus("");
+                    alert("⚠️ ጥያቄዎችን መክፈት አልተቻለም: " + err.message);
                 });
         }
 
@@ -429,12 +462,26 @@ MINI_APP_HTML = """
                     document.getElementById('payment-view').classList.remove('hidden');
                     return;
                 }
+                const correctLetter = (data.correct_answer || q.correct_answer || 'A').toUpperCase();
                 if (data.is_correct) {
                     score++;
                     document.getElementById(`btn-${selectedOpt.toLowerCase()}`).classList.add('correct');
                 } else {
                     document.getElementById(`btn-${selectedOpt.toLowerCase()}`).classList.add('incorrect');
-                    document.getElementById(`btn-${data.correct_answer.toLowerCase()}`).classList.add('correct');
+                    if (document.getElementById(`btn-${correctLetter.toLowerCase()}`)) {
+                        document.getElementById(`btn-${correctLetter.toLowerCase()}`).classList.add('correct');
+                    }
+                }
+                document.getElementById('explanation').innerText = `💡 ማብራሪያ: ${q.explanation || 'ለዚህ ጥያቄ ማብራሪያ አልተሰጠም።'}`;
+                document.getElementById('next-btn').classList.remove('hidden');
+            })
+            .catch(() => {
+                const correctLetter = (q.correct_answer || 'A').toUpperCase();
+                if (selectedOpt === correctLetter) {
+                    score++;
+                    document.getElementById(`btn-${selectedOpt.toLowerCase()}`).classList.add('correct');
+                } else {
+                    document.getElementById(`btn-${selectedOpt.toLowerCase()}`).classList.add('incorrect');
                 }
                 document.getElementById('explanation').innerText = `💡 ማብራሪያ: ${q.explanation || 'ለዚህ ጥያቄ ማብራሪያ አልተሰጠም።'}`;
                 document.getElementById('next-btn').classList.remove('hidden');
@@ -503,6 +550,49 @@ def get_user_approved_courses(conn, user_id: int) -> list:
     return sorted({x.strip() for x in raw_depts.split(",") if x.strip()})
 
 
+def resolve_student_department(conn, user_id: int) -> str:
+    cur = conn.cursor()
+    cur.execute("SELECT department, paid_department FROM users WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    dept = (row[0] or "").strip() if row else ""
+    paid_raw = (row[1] or "").strip() if row else ""
+
+    if dept and dept.upper() not in ("", "UNKNOWN", "NONE"):
+        return dept
+
+    if paid_raw:
+        items = [x.strip() for x in paid_raw.split(",") if x.strip()]
+        for item in items:
+            if item.startswith("Freshman_Social_"):
+                return "Freshman_Social"
+            if item.startswith("Freshman_"):
+                return "Freshman"
+            if item.startswith("CS_"):
+                return "CS"
+            if item.startswith("IT_"):
+                return "IT"
+            if item.startswith("Remedial"):
+                return "Remedial"
+        if items:
+            return items[0].split("_")[0]
+
+    cur.execute(
+        """
+        SELECT q.subject
+        FROM bookmarks b
+        JOIN questions q ON b.question_id = q.id
+        WHERE b.user_id = ?
+        ORDER BY q.id DESC LIMIT 1
+        """,
+        (user_id,),
+    )
+    bm_row = cur.fetchone()
+    if bm_row and bm_row[0]:
+        return bm_row[0]
+
+    return "CS"
+
+
 def init_documents_table():
     conn = get_conn()
     try:
@@ -534,14 +624,14 @@ def check_user_paid_for_topic(conn, user_id: int, subj: str, year: str) -> bool:
     if pay_status != "paid":
         return False
 
-    paid_set = {x.strip() for x in paid_depts.split(",") if x.strip()}
-    pay_key = f"{subj}_{year}"
-    t_code = KEY_BY_PAIR.get((subj, year), "")
+    paid_set = {x.strip().lower() for x in paid_depts.split(",") if x.strip()}
+    pay_key = f"{subj}_{year}".lower()
+    t_code = KEY_BY_PAIR.get((subj, year), "").lower()
     return (
         pay_key in paid_set
         or (t_code and t_code in paid_set)
-        or subj in paid_set
-        or "ALL" in paid_set
+        or subj.lower() in paid_set
+        or "all" in paid_set
     )
 
 
@@ -767,11 +857,13 @@ async def show_main_menu(message_or_callback, user_id, user_name, edit=False):
     finally:
         conn.close()
 
+    dynamic_webapp_url = f"{WEBAPP_URL}?user_id={user_id}"
+
     builder = InlineKeyboardBuilder()
     builder.row(
         types.InlineKeyboardButton(
             text="🤖 ፈተናውን በ ሚኒ አፕ ክፈት" if user_lang == "am" else "🤖 Open Exam Mini App",
-            web_app=types.WebAppInfo(url=WEBAPP_URL),
+            web_app=types.WebAppInfo(url=dynamic_webapp_url),
         )
     )
     builder.row(
@@ -998,7 +1090,14 @@ async def set_language(callback: types.CallbackQuery):
     new_lang = callback.data.split("_")[2]
     conn = get_conn()
     try:
-        conn.execute("UPDATE users SET lang = ? WHERE user_id = ?", (new_lang, user_id))
+        conn.execute(
+            """
+            INSERT INTO users (user_id, department, lang)
+            VALUES (?, 'CS', ?)
+            ON CONFLICT(user_id) DO UPDATE SET lang = excluded.lang
+            """,
+            (user_id, new_lang),
+        )
         conn.commit()
     finally:
         conn.close()
@@ -1031,7 +1130,14 @@ async def set_department_action(callback: types.CallbackQuery):
     selected_dept = callback.data.replace("set_dept_", "", 1)
     conn = get_conn()
     try:
-        conn.execute("UPDATE users SET department = ? WHERE user_id = ?", (selected_dept, user_id))
+        conn.execute(
+            """
+            INSERT INTO users (user_id, department, lang)
+            VALUES (?, ?, 'am')
+            ON CONFLICT(user_id) DO UPDATE SET department = excluded.department
+            """,
+            (user_id, selected_dept),
+        )
         conn.commit()
     finally:
         conn.close()
@@ -1303,13 +1409,25 @@ async def handle_payment_screenshot(message: types.Message):
 
     conn = get_conn()
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT department FROM users WHERE user_id = ?", (user_id,))
-        res = cur.fetchone()
         existing_approved = get_user_approved_courses(conn, user_id)
+        student_dept = resolve_student_department(conn, user_id)
+        conn.execute(
+            """
+            INSERT INTO users (user_id, department, lang)
+            VALUES (?, ?, 'am')
+            ON CONFLICT(user_id) DO UPDATE SET
+                department = CASE
+                    WHEN users.department IS NULL OR TRIM(users.department) = '' OR UPPER(TRIM(users.department)) = 'UNKNOWN'
+                    THEN excluded.department
+                    ELSE users.department
+                END
+            """,
+            (user_id, student_dept),
+        )
+        conn.commit()
     finally:
         conn.close()
-    student_dept = res[0] if res else "Unknown"
+
     existing_str = ", ".join(existing_approved) if existing_approved else "None"
 
     await message.answer("📥 **የክፍያ ስክሪንሾትዎ ደርሷል!** አድሚኑ እስኪያረጋግጠው ይጠብቁ።", parse_mode="Markdown")
@@ -1418,20 +1536,33 @@ async def admin_finalize_approve(callback: types.CallbackQuery):
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT paid_department FROM users WHERE user_id = ?", (target_user_id,))
+        cur.execute("SELECT paid_department, department FROM users WHERE user_id = ?", (target_user_id,))
         res = cur.fetchone()
         existing_depts = res[0].split(",") if res and res[0] else []
+        current_dept = (res[1] or "").strip() if res else ""
         combined_depts = sorted(set(filter(None, existing_depts)).union(selected_keys))
         new_paid_str = ",".join(combined_depts)
+
+        inferred_dept = current_dept
+        if not inferred_dept or inferred_dept.upper() == "UNKNOWN":
+            first_key = sorted(selected_keys)[0]
+            if first_key.startswith("Freshman_Social_"):
+                inferred_dept = "Freshman_Social"
+            elif first_key.startswith("Freshman_"):
+                inferred_dept = "Freshman"
+            else:
+                inferred_dept = first_key.split("_")[0]
+
         cur.execute(
             """
-            INSERT INTO users (user_id, payment_status, paid_department)
-            VALUES (?, 'paid', ?)
+            INSERT INTO users (user_id, department, payment_status, paid_department)
+            VALUES (?, ?, 'paid', ?)
             ON CONFLICT(user_id) DO UPDATE SET
+                department = excluded.department,
                 payment_status = 'paid',
                 paid_department = excluded.paid_department
             """,
-            (target_user_id, new_paid_str),
+            (target_user_id, inferred_dept, new_paid_str),
         )
         conn.commit()
     finally:
@@ -1441,8 +1572,12 @@ async def admin_finalize_approve(callback: types.CallbackQuery):
     newly_approved_str = ", ".join(sorted(selected_keys))
     all_approved_str = ", ".join(combined_depts)
 
+    updated_caption = (callback.message.caption or "").replace(
+        "🎯 ዲፓርትመንት: Unknown", f"🎯 ዲፓርትመንት: {inferred_dept}"
+    )
+
     await callback.message.edit_caption(
-        caption=(callback.message.caption or "")
+        caption=updated_caption
         + f"\n\n✅ [APPROVED NOW: {newly_approved_str}]\n📋 [ALL APPROVED FOR USER: {all_approved_str}]",
         reply_markup=None,
     )
@@ -1453,7 +1588,7 @@ async def admin_finalize_approve(callback: types.CallbackQuery):
         builder.row(types.InlineKeyboardButton(text="🏠 ዋና ማውጫ", callback_data="back_menu"))
         student_msg = (
             "🎉 **እንኳን ደስ አለዎት!** አድሚኑ ክፍያዎን አረጋግጦታል (Approved)።\n\n"
-            "✅ **አሁን የተከፈቱልዎ ኮርሶች:**\n"
+            "✅ **አሁን የተከፈቱልዎ ኮርሶች (ሙሉ ጥያቄዎች):**\n"
             + "\n".join(f"• **{c}**" for c in sorted(selected_keys))
             + "\n\n📋 **በጠቅላላ Approved የተደረጉልዎ ኮርሶች:**\n"
             + "\n".join(f"• **{c}**" for c in combined_depts)
@@ -1501,6 +1636,21 @@ async def start_specific_exam(callback: types.CallbackQuery):
 
     conn = get_conn()
     try:
+        conn.execute(
+            """
+            INSERT INTO users (user_id, department, lang)
+            VALUES (?, ?, 'am')
+            ON CONFLICT(user_id) DO UPDATE SET
+                department = CASE
+                    WHEN users.department IS NULL OR TRIM(users.department) = '' OR UPPER(TRIM(users.department)) = 'UNKNOWN'
+                    THEN excluded.department
+                    ELSE users.department
+                END
+            """,
+            (user_id, subj),
+        )
+        conn.commit()
+
         is_paid_for_this = check_user_paid_for_topic(conn, user_id, subj, topic)
         approved_list = get_user_approved_courses(conn, user_id)
         if not is_paid_for_this and offset_val >= 3:
