@@ -158,9 +158,6 @@ def _read_csv_flexible(full_path: str) -> pd.DataFrame:
 
 
 def load_all_exam_datasets(custom_files=None):
-    """
-    ነባር ጥያቄዎችን ሳያጠፋ አዳዲስ ጥያቄዎችን ብቻ (duplicate ያልሆኑትን) ይጨምራል።
-    """
     init_db()
     required_cols = [
         "question_text", "option_a", "option_b", "option_c", "option_d", "correct_answer", "explanation"

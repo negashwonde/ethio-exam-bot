@@ -14,6 +14,29 @@ app = Flask(__name__)
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://ethio-exam-bot-882d.onrender.com/webapp")
 DOCS_CHANNEL_URL = os.environ.get("DOCS_CHANNEL_URL", "https://t.me/NegashComputerTips/264")
 
+DOC_DEPTS = {
+    "CS": {
+        "label": "💻 CS Document",
+        "url": os.environ.get("CS_DOCS_URL", "https://t.me/NegashComputerTips/261"),
+    },
+    "IT": {
+        "label": "📚 IT Document",
+        "url": os.environ.get("IT_DOCS_URL", "https://t.me/NegashComputerTips/263"),
+    },
+    "Freshman": {
+        "label": "📚 Freshman (Natural) Document",
+        "url": os.environ.get("FRESHMAN_NATURAL_DOCS_URL", "https://t.me/NegashComputerTips/264"),
+    },
+    "Freshman_Social": {
+        "label": "📚 Freshman (Social) Document",
+        "url": os.environ.get("FRESHMAN_SOCIAL_DOCS_URL", "https://t.me/NegashComputerTips/264"),
+    },
+    "Remedial": {
+        "label": "📖 Remedial Document",
+        "url": os.environ.get("REMEDIAL_DOCS_URL", "https://t.me/NegashComputerTips/264"),
+    },
+}
+
 MINI_APP_HTML = """
 <!DOCTYPE html>
 <html lang="am">
@@ -110,19 +133,30 @@ MINI_APP_HTML = """
         <button class="btn" onclick="showSocialFreshmanMenu()">📚 Freshman Program (Social)</button>
         <button class="btn" onclick="alert('📖 Remedial program exams and materials will be updated soon!')">📖 Remedial Program</button>
         <button class="btn" onclick="alert('📊 የርስዎን ውጤት ለማየት ዋናውን የቴሌግራም ቦት ይጠቀሙ።')">📊 የእኔ ውጤት (My Progress)</button>
-        <button class="btn" onclick="showDocsView()">📄 ሰነዶች (ማቴሪያሎች)</button>
+        <button class="btn" onclick="showDocsDeptMenu()">📄 ሰነዶች (ማቴሪያሎች)</button>
         <button class="btn" onclick="alert('ℹ️ WankExamBot ለሁሉም የዩኒቨርሲቲ ተማሪዎች የተዘጋጀ የዝግጅት ረዳት ነው።')">ℹ️ ስለ ቦቱ (About Bot)</button>
         <button class="btn" onclick="alert('🎧 እርዳታ ለማግኘት በስልክ ቁጥር 0919245693 ወይም @neguRoha ያግኙን።')">🎧 እርዳታ እና ድጋፍ (Support)</button>
     </div>
 
-    <div id="docs-view" class="card hidden">
+    <div id="docs-dept-view" class="card hidden">
         <h3 style="color: #38bdf8;">📄 ሰነዶች እና ማቴሪያሎች</h3>
+        <div class="info-box">👇 የትኛውን ዲፓርትመንት ሰነድ ይፈልጋሉ? ይምረጡ:</div>
+        <button class="btn" onclick="openDeptDocs('CS', 'CS Document')">💻 CS Document</button>
+        <button class="btn" onclick="openDeptDocs('IT', 'IT Document')">📚 IT Document</button>
+        <button class="btn" onclick="openDeptDocs('Freshman', 'Freshman (Natural) Document')">📚 Freshman (Natural) Document</button>
+        <button class="btn" onclick="openDeptDocs('Freshman_Social', 'Freshman (Social) Document')">📚 Freshman (Social) Document</button>
+        <button class="btn" onclick="openDeptDocs('Remedial', 'Remedial Document')">📖 Remedial Document</button>
+        <button class="btn" onclick="backToMenu()" style="background: #475569; margin-top: 12px; text-align: center;">🏠 ዋና ማውጫ (Main Menu)</button>
+    </div>
+
+    <div id="docs-view" class="card hidden">
+        <h3 id="docs-dept-title" style="color: #38bdf8;">📄 ሰነዶች</h3>
         <div class="info-box">
-            ለሁሉም ዲፓርትመንቶች የተዘጋጁ የExit Exam እና Freshman ማስታወሻዎችና ሰነዶች እዚህ ይገኛሉ:<br><br>
-            🔗 ዋና ማቴሪያል ሊንክ:<br>
-            <a class="doc-link" href="https://t.me/NegashComputerTips/264" target="_blank">https://t.me/NegashComputerTips/264</a>
+            🔗 የማቴሪያሎች ሊንክ:<br>
+            <a id="docs-dept-link" class="doc-link" href="https://t.me/NegashComputerTips/264" target="_blank">https://t.me/NegashComputerTips/264</a>
         </div>
         <div id="docs-list" style="font-size: 13px; color: #e2e8f0; margin-bottom: 12px;"></div>
+        <button class="btn" onclick="showDocsDeptMenu()" style="background: #334155; text-align: center;">⬅️ የዲፓርትመንት ምርጫ</button>
         <button class="btn" onclick="backToMenu()" style="background: #475569; text-align: center;">🏠 ዋና ማውጫ (Main Menu)</button>
     </div>
 
@@ -215,20 +249,31 @@ MINI_APP_HTML = """
         const FREE_LIMIT = 3;
 
         function hideAllViews() {
-            ['menu-view', 'docs-view', 'submenu-view', 'freshman-view', 'freshman-social-view', 'exam-view', 'payment-view', 'result-view']
+            ['menu-view', 'docs-dept-view', 'docs-view', 'submenu-view', 'freshman-view', 'freshman-social-view', 'exam-view', 'payment-view', 'result-view']
                 .forEach(id => document.getElementById(id).classList.add('hidden'));
         }
 
-        function showDocsView() {
+        function showDocsDeptMenu() {
             hideAllViews();
+            document.getElementById('docs-dept-view').classList.remove('hidden');
+        }
+
+        function openDeptDocs(deptCode, deptLabel) {
+            hideAllViews();
+            document.getElementById('docs-dept-title').innerText = `📄 ${deptLabel}`;
             document.getElementById('docs-view').classList.remove('hidden');
-            fetch('/api/documents')
+            fetch(`/api/documents?dept=${encodeURIComponent(deptCode)}`)
                 .then(res => res.json())
                 .then(data => {
+                    const linkEl = document.getElementById('docs-dept-link');
+                    const deptUrl = data.dept_url || data.channel_url || 'https://t.me/NegashComputerTips/264';
+                    linkEl.href = deptUrl;
+                    linkEl.innerText = deptUrl;
+
                     const listEl = document.getElementById('docs-list');
                     const docs = data.documents || [];
                     if (docs.length === 0) {
-                        listEl.innerHTML = '<div>📌 ተጨማሪ ሰነዶች ሲታከሉ እዚህ ይታያሉ።</div>';
+                        listEl.innerHTML = '<div>📌 ለዚህ ዲፓርትመንት ተጨማሪ ሰነዶች ሲታከሉ እዚህ ይታያሉ። ከላይ ያለውን ሊንክም ይመልከቱ።</div>';
                         return;
                     }
                     listEl.innerHTML = docs.map(d =>
@@ -400,6 +445,13 @@ TOPIC_KEYS = {
 KEY_BY_PAIR = {v: k for k, v in TOPIC_KEYS.items()}
 
 
+def get_dept_doc_url(dept_code: str) -> str:
+    info = DOC_DEPTS.get(dept_code)
+    if info and info.get("url"):
+        return info["url"]
+    return DOCS_CHANNEL_URL
+
+
 def init_documents_table():
     conn = get_conn()
     try:
@@ -494,16 +546,32 @@ def webapp():
 @app.route("/api/documents")
 def api_documents():
     init_documents_table()
+    dept = request.args.get("dept", "").strip()
     conn = get_conn()
     try:
-        rows = conn.execute(
-            "SELECT id, department, title, file_name, url FROM documents ORDER BY id DESC LIMIT 20"
-        ).fetchall()
+        if dept:
+            rows = conn.execute(
+                """
+                SELECT id, department, title, file_name, url
+                FROM documents
+                WHERE department = ? OR department = 'ALL'
+                ORDER BY id DESC LIMIT 20
+                """,
+                (dept,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id, department, title, file_name, url FROM documents ORDER BY id DESC LIMIT 20"
+            ).fetchall()
         docs = [
             {"id": r[0], "department": r[1], "title": r[2], "file_name": r[3], "url": r[4]}
             for r in rows
         ]
-        return jsonify({"channel_url": DOCS_CHANNEL_URL, "documents": docs})
+        return jsonify({
+            "channel_url": DOCS_CHANNEL_URL,
+            "dept_url": get_dept_doc_url(dept) if dept else DOCS_CHANNEL_URL,
+            "documents": docs,
+        })
     finally:
         conn.close()
 
@@ -717,9 +785,10 @@ async def cmd_add_doc(message: types.Message):
         return
     raw_args = message.text.replace("/adddoc", "", 1).strip()
     parts = [p.strip() for p in raw_args.split("|")]
-    title = parts[0] if len(parts) >= 1 and parts[0] else "Exit Exam & Freshman Material"
-    url = parts[1] if len(parts) >= 2 and parts[1] else DOCS_CHANNEL_URL
+    title = parts[0] if len(parts) >= 1 and parts[0] else "Study Material"
     dept = parts[2] if len(parts) >= 3 and parts[2] else "ALL"
+    default_url = get_dept_doc_url(dept) if dept in DOC_DEPTS else DOCS_CHANNEL_URL
+    url = parts[1] if len(parts) >= 2 and parts[1] else default_url
 
     init_documents_table()
     conn = get_conn()
@@ -745,20 +814,31 @@ async def handle_admin_document_upload(message: types.Message):
         return
 
     doc = message.document
-    title = (message.caption or doc.file_name or "Study Material").strip()
+    cap = (message.caption or "").strip()
+    dept = "ALL"
+    title = doc.file_name or "Study Material"
+    if "|" in cap:
+        p = [x.strip() for x in cap.split("|", 1)]
+        title = p[0] or title
+        if p[1] in DOC_DEPTS or p[1] == "ALL":
+            dept = p[1]
+    elif cap:
+        title = cap
+
+    dept_url = get_dept_doc_url(dept) if dept in DOC_DEPTS else DOCS_CHANNEL_URL
     init_documents_table()
     conn = get_conn()
     try:
         conn.execute(
             "INSERT INTO documents (department, title, file_id, file_name, url) VALUES (?, ?, ?, ?, ?)",
-            ("ALL", title, doc.file_id, doc.file_name or "", DOCS_CHANNEL_URL),
+            (dept, title, doc.file_id, doc.file_name or "", dept_url),
         )
         conn.commit()
     finally:
         conn.close()
 
     await message.answer(
-        f"✅ ሰነዱ ለሁሉም ዲፓርትመንት ተመዝግቧል!\n• ፋይል: `{doc.file_name}`\n• ርዕስ: **{title}**",
+        f"✅ ሰነዱ ተመዝግቧል!\n• ፋይል: `{doc.file_name}`\n• ርዕስ: **{title}**\n• ዲፓርትመንት: **{dept}**",
         parse_mode="Markdown",
     )
 
@@ -970,18 +1050,47 @@ async def show_my_bookmarks(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "tutorial_package")
 async def tutorial_package_menu(callback: types.CallbackQuery):
     await callback.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="💻 CS Document", callback_data="doc_dept_CS"))
+    builder.row(types.InlineKeyboardButton(text="📚 IT Document", callback_data="doc_dept_IT"))
+    builder.row(types.InlineKeyboardButton(text="📚 Freshman (Natural) Document", callback_data="doc_dept_Freshman"))
+    builder.row(types.InlineKeyboardButton(text="📚 Freshman (Social) Document", callback_data="doc_dept_Freshman_Social"))
+    builder.row(types.InlineKeyboardButton(text="📖 Remedial Document", callback_data="doc_dept_Remedial"))
+    builder.row(types.InlineKeyboardButton(text="🏠 ዋና ማውጫ", callback_data="back_menu"))
+
+    await callback.message.edit_text(
+        "📄 **ሰነዶች እና ማቴሪያሎች**\n\n👇 የሚፈልጉትን ዲፓርትመንት ሰነድ ይምረጡ:",
+        reply_markup=builder.as_markup(),
+        parse_mode="Markdown",
+    )
+
+
+@dp.callback_query(F.data.startswith("doc_dept_"))
+async def show_dept_documents(callback: types.CallbackQuery):
+    await callback.answer()
+    dept_code = callback.data.replace("doc_dept_", "", 1)
+    dept_info = DOC_DEPTS.get(dept_code, {"label": dept_code, "url": DOCS_CHANNEL_URL})
+    dept_label = dept_info["label"]
+    dept_url = dept_info["url"]
+
     init_documents_table()
     conn = get_conn()
     try:
         docs = conn.execute(
-            "SELECT title, file_id, url FROM documents ORDER BY id DESC LIMIT 10"
+            """
+            SELECT title, file_id, url
+            FROM documents
+            WHERE department = ? OR department = 'ALL'
+            ORDER BY id DESC LIMIT 10
+            """,
+            (dept_code,),
         ).fetchall()
     finally:
         conn.close()
 
     lines = [
-        "📄 **ሰነዶች እና ማቴሪያሎች**\n",
-        f"🔗 **የExit Exam እና Freshman ሰነዶች ሊንክ:**\n{DOCS_CHANNEL_URL}\n",
+        f"📄 **{dept_label}**\n",
+        f"🔗 **የ{dept_label} ማቴሪያሎች ሊንክ:**\n{dept_url}\n",
     ]
     if docs:
         lines.append("📚 **የተጨመሩ ሰነዶች:**")
@@ -989,17 +1098,18 @@ async def tutorial_package_menu(callback: types.CallbackQuery):
             link_part = f" — {url}" if url else ""
             lines.append(f"• **{title}**{link_part}")
     else:
-        lines.append("የExit Exam እና Freshman ማስታወሻዎች ከላይ ባለው ሊንክ ይገኛሉ።")
+        lines.append("የዚህ ዲፓርትመንት ማስታወሻዎች ከላይ ባለው ሊንክ ይገኛሉ።")
 
-    builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="📂 ማቴሪያሎችን ክፈት", url=DOCS_CHANNEL_URL))
     for title, file_id, _ in docs:
         if file_id:
             try:
-                await callback.message.answer_document(document=file_id, caption=f"📄 {title}")
+                await callback.message.answer_document(document=file_id, caption=f"📄 {title} ({dept_label})")
             except Exception as e:
                 logging.error(f"Send document error: {e}")
 
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text="📂 ማቴሪያሎችን ክፈት", url=dept_url))
+    builder.row(types.InlineKeyboardButton(text="⬅️ የሰነድ ዲፓርትመንቶች", callback_data="tutorial_package"))
     builder.row(types.InlineKeyboardButton(text="🏠 ዋና ማውጫ", callback_data="back_menu"))
     await callback.message.edit_text("\n".join(lines), reply_markup=builder.as_markup(), parse_mode="Markdown")
 
